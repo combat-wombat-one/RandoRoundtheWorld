@@ -2,15 +2,16 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>360° Viewer + Map</title>
+  <title>360° Location Guessing Game</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     body { margin: 0; overflow: hidden; }
 
-    #nextBtn, #removeBtn, #submitBtn {
+    button {
       position: absolute;
       top: 20px;
       padding: 10px 20px;
@@ -45,78 +46,119 @@
 <body>
   <button id="nextBtn">🎲 Next Location</button>
   <button id="removeBtn">🗑 Remove Pin</button>
-  <button id="submitBtn">✅ Submit Location</button>
+  <button id="submitBtn">✅ Submit Guess</button>
 
-  <div id="mapContainer">
-    <div id="map"></div>
-  </div>
+  <div id="mapContainer"><div id="map"></div></div>
 
   <a-scene>
-    <a-assets>
-      <img id="pano1" src="Images/sechelt.jpg" crossorigin="anonymous">
-      <img id="pano2" src="Images/malta.jpg" crossorigin="anonymous">
-      <img id="pano3" src="Images/swiss.jpg" crossorigin="anonymous">
-      <img id="pano4" src="Images/temple.jpg" crossorigin="anonymous">
-    </a-assets>
-
+    <a-assets id="assetsContainer"></a-assets>
     <a-sky id="sky" rotation="0 -130 0"></a-sky>
   </a-scene>
 
   <script>
-    // A-Frame rotation logic
-    const images = [
-      { name: "Sechelt", id: "#pano1" },
-      { name: "Malta", id: "#pano2" },
-      { name: "Swiss", id: "#pano3" },
-      { name: "Temple", id: "#pano4" }
-    ];
+    let locations = [];      // Loaded from CSV
+    let current = 0;         // Current index
+    let marker = null;       // Map marker
+    let map;
 
-    let current = 0;
-
-    function loadImage(index) {
-      document.getElementById("sky").setAttribute("src", images[index].id);
+    function loadSky(filename) {
+      const sky = document.getElementById("sky");
+      sky.setAttribute("src", `Images/${filename}`);
     }
 
-    document.getElementById("nextBtn").addEventListener("click", () => {
-      current = (current + 1) % images.length;
-      loadImage(current);
-    });
+    function loadNextScene() {
+      current = (current + 1) % locations.length;
+      loadSky(locations[current].filename);
+    }
 
-    window.addEventListener("load", () => {
-      loadImage(current);
-    });
-  </script>
+    function distanceInKm(lat1, lon1, lat2, lon2) {
+      // Haversine Formula
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
 
-  <script>
-    // Leaflet map logic
-    let map = L.map('map').setView([37.7749, -122.4194], 4); // Default: San Francisco
+    function setupMap() {
+      map = L.map('map').setView([20, 0], 2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+      map.on('click', function(e) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker(e.latlng).addTo(map);
+      });
+    }
 
-    let marker = null;
+    function setupButtons() {
+      document.getElementById("nextBtn").addEventListener("click", () => {
+        if (marker) {
+          map.removeLayer(marker);
+          marker = null;
+        }
+        loadNextScene();
+      });
 
-    map.on('click', function(e) {
-      if (marker) map.removeLayer(marker);
-      marker = L.marker(e.latlng).addTo(map);
-    });
+      document.getElementById("removeBtn").addEventListener("click", () => {
+        if (marker) {
+          map.removeLayer(marker);
+          marker = null;
+        }
+      });
 
-    document.getElementById("removeBtn").addEventListener("click", () => {
-      if (marker) {
-        map.removeLayer(marker);
-        marker = null;
-      }
-    });
+      document.getElementById("submitBtn").addEventListener("click", () => {
+        if (!marker) {
+          alert("❗ Place a pin on the map first.");
+          return;
+        }
+        const guess = marker.getLatLng();
+        const actual = locations[current];
+        const dist = distanceInKm(guess.lat, guess.lng, actual.latitude, actual.longitude);
+        const score = Math.max(0, Math.round(5000 - dist * 100)); // out of 5000
+        alert(`📍 You were ${dist.toFixed(2)} km away\n🎯 Score: ${score} / 5000`);
+      });
+    }
 
-    document.getElementById("submitBtn").addEventListener("click", () => {
-      if (marker) {
-        const { lat, lng } = marker.getLatLng();
-        alert(`📍 Submitted:\nLat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`);
-      } else {
-        alert("❗ No pin placed.");
-      }
-    });
+    function preloadImages() {
+      const assets = document.getElementById("assetsContainer");
+      locations.forEach(loc => {
+        const img = document.createElement("img");
+        img.setAttribute("id", `img-${loc.filename}`);
+        img.setAttribute("src", `Images/${loc.filename}`);
+        img.setAttribute("crossorigin", "anonymous");
+        img.style.display = "none";
+        assets.appendChild(img);
+      });
+    }
+
+    function init() {
+      Papa.parse("locations.csv", {
+        download: true,
+        header: true,
+        complete: (results) => {
+          locations = results.data.map(row => ({
+            filename: row.filename,
+            latitude: parseFloat(row.latitude),
+            longitude: parseFloat(row.longitude)
+          })).filter(loc => !isNaN(loc.latitude) && !isNaN(loc.longitude));
+          if (locations.length === 0) {
+            alert("⚠️ No valid data in CSV.");
+            return;
+          }
+          preloadImages();
+          loadSky(locations[current].filename);
+        }
+      });
+    }
+
+    setupMap();
+    setupButtons();
+    window.addEventListener("load", init);
   </script>
 </body>
 </html>
