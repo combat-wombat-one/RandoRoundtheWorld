@@ -1,61 +1,122 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>360° World Explorer</title>
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <style>
-      #nextBtn {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        z-index: 9999;
-        padding: 10px 20px;
-        background: white;
-        border: none;
-        font-size: 18px;
-        cursor: pointer;
-        border-radius: 5px;
+<head>
+  <meta charset="utf-8" />
+  <title>360° Viewer + Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+
+    #nextBtn, #removeBtn, #submitBtn {
+      position: absolute;
+      top: 20px;
+      padding: 10px 20px;
+      background: white;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      z-index: 1001;
+    }
+
+    #nextBtn { left: 20px; }
+    #removeBtn { left: 160px; }
+    #submitBtn { left: 300px; }
+
+    #mapContainer {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 400px;
+      height: 300px;
+      border: 2px solid #ccc;
+      z-index: 1000;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <button id="nextBtn">🎲 Next Location</button>
+  <button id="removeBtn">🗑 Remove Pin</button>
+  <button id="submitBtn">✅ Submit Location</button>
+
+  <div id="mapContainer">
+    <div id="map"></div>
+  </div>
+
+  <a-scene>
+    <a-assets>
+      <img id="pano1" src="Images/sechelt.jpg" crossorigin="anonymous">
+      <img id="pano2" src="Images/malta.jpg" crossorigin="anonymous">
+      <img id="pano3" src="Images/swiss.jpg" crossorigin="anonymous">
+      <img id="pano4" src="Images/temple.jpg" crossorigin="anonymous">
+    </a-assets>
+
+    <a-sky id="sky" rotation="0 -130 0"></a-sky>
+  </a-scene>
+
+  <script>
+    // A-Frame rotation logic
+    const images = [
+      { name: "Sechelt", id: "#pano1" },
+      { name: "Malta", id: "#pano2" },
+      { name: "Swiss", id: "#pano3" },
+      { name: "Temple", id: "#pano4" }
+    ];
+
+    let current = 0;
+
+    function loadImage(index) {
+      document.getElementById("sky").setAttribute("src", images[index].id);
+    }
+
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      current = (current + 1) % images.length;
+      loadImage(current);
+    });
+
+    window.addEventListener("load", () => {
+      loadImage(current);
+    });
+  </script>
+
+  <script>
+    // Leaflet map logic
+    let map = L.map('map').setView([37.7749, -122.4194], 4); // Default: San Francisco
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker = null;
+
+    map.on('click', function(e) {
+      if (marker) map.removeLayer(marker);
+      marker = L.marker(e.latlng).addTo(map);
+    });
+
+    document.getElementById("removeBtn").addEventListener("click", () => {
+      if (marker) {
+        map.removeLayer(marker);
+        marker = null;
       }
-    </style>
-  </head>
-  <body>
-    <button id="nextBtn">🎲 Next Location</button>
+    });
 
-    <a-scene>
-      <a-assets>
-        <img id="pano1" crossorigin="anonymous" src="Images/sechelt.jpg" />
-        <img id="pano2" crossorigin="anonymous" src="Images/malta.jpg" />
-        <img id="pano3" crossorigin="anonymous" src="Images/swiss.jpg" />
-        <img id="pano4" crossorigin="anonymous" src="Images/temple.jpg" />
-      </a-assets>
-
-      <a-sky id="sky" rotation="0 -130 0"></a-sky>
-    </a-scene>
-
-    <script>
-      const images = [
-        { name: "Sechelt", id: "#pano1" },
-        { name: "Malta Bay", id: "#pano2" },
-        { name: "Swiss Alps", id: "#pano3" },
-        { name: "Temple Interior", id: "#pano4" },
-      ];
-
-      let current = 0;
-
-      function loadImage(index) {
-        const sky = document.getElementById("sky");
-        sky.setAttribute("src", images[index].id);
+    document.getElementById("submitBtn").addEventListener("click", () => {
+      if (marker) {
+        const { lat, lng } = marker.getLatLng();
+        alert(`📍 Submitted:\nLat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`);
+      } else {
+        alert("❗ No pin placed.");
       }
-
-      document.getElementById("nextBtn").addEventListener("click", () => {
-        current = (current + 1) % images.length;
-        loadImage(current);
-      });
-
-      window.addEventListener("load", () => {
-        loadImage(current);
-      });
-    </script>
-  </body>
+    });
+  </script>
+</body>
 </html>
