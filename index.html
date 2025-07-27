@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>360° Location Guessing Game</title>
+  <title>360° GeoGuess Game</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -41,6 +41,20 @@
       width: 100%;
       height: 100%;
     }
+
+    #infoPanel {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      background: rgba(255,255,255,0.95);
+      border-radius: 10px;
+      padding: 15px 20px;
+      font-family: sans-serif;
+      font-size: 16px;
+      z-index: 1001;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -49,6 +63,7 @@
   <button id="submitBtn">✅ Submit Guess</button>
 
   <div id="mapContainer"><div id="map"></div></div>
+  <div id="infoPanel"></div>
 
   <a-scene>
     <a-assets id="assetsContainer"></a-assets>
@@ -56,9 +71,11 @@
   </a-scene>
 
   <script>
-    let locations = [];      // Loaded from CSV
-    let current = 0;         // Current index
-    let marker = null;       // Map marker
+    let locations = [];
+    let current = 0;
+    let marker = null;
+    let trueMarker = null;
+    let line = null;
     let map;
 
     function loadSky(filename) {
@@ -69,10 +86,17 @@
     function loadNextScene() {
       current = (current + 1) % locations.length;
       loadSky(locations[current].filename);
+      clearMapObjects();
+      document.getElementById("infoPanel").style.display = "none";
+    }
+
+    function clearMapObjects() {
+      if (marker) { map.removeLayer(marker); marker = null; }
+      if (trueMarker) { map.removeLayer(trueMarker); trueMarker = null; }
+      if (line) { map.removeLayer(line); line = null; }
     }
 
     function distanceInKm(lat1, lon1, lat2, lon2) {
-      // Haversine Formula
       const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -96,31 +120,51 @@
     }
 
     function setupButtons() {
-      document.getElementById("nextBtn").addEventListener("click", () => {
-        if (marker) {
-          map.removeLayer(marker);
-          marker = null;
-        }
-        loadNextScene();
-      });
+      document.getElementById("nextBtn").addEventListener("click", loadNextScene);
 
       document.getElementById("removeBtn").addEventListener("click", () => {
-        if (marker) {
-          map.removeLayer(marker);
-          marker = null;
-        }
+        if (marker) { map.removeLayer(marker); marker = null; }
       });
 
       document.getElementById("submitBtn").addEventListener("click", () => {
         if (!marker) {
-          alert("❗ Place a pin on the map first.");
+          alert("❗ Please drop a pin first.");
           return;
         }
+
         const guess = marker.getLatLng();
         const actual = locations[current];
         const dist = distanceInKm(guess.lat, guess.lng, actual.latitude, actual.longitude);
-        const score = Math.max(0, Math.round(5000 - dist * 100)); // out of 5000
-        alert(`📍 You were ${dist.toFixed(2)} km away\n🎯 Score: ${score} / 5000`);
+        const score = Math.max(0, Math.round(5000 - dist * 100));
+
+        // Add true marker
+        if (trueMarker) map.removeLayer(trueMarker);
+        trueMarker = L.marker([actual.latitude, actual.longitude], {
+          icon: L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32]
+          })
+        }).addTo(map);
+
+        // Draw line
+        if (line) map.removeLayer(line);
+        line = L.polyline([
+          [guess.lat, guess.lng],
+          [actual.latitude, actual.longitude]
+        ], {
+          color: 'red',
+          weight: 3
+        }).addTo(map);
+
+        // Show info
+        const panel = document.getElementById("infoPanel");
+        panel.innerHTML = `
+          <strong>📸 Image:</strong> ${actual.filename}<br>
+          <strong>📍 Distance:</strong> ${dist.toFixed(2)} km<br>
+          <strong>🎯 Score:</strong> ${score} / 5000
+        `;
+        panel.style.display = 'block';
       });
     }
 
