@@ -22,28 +22,23 @@
   <body>
     <button id="nextBtn">🎲 Next Location</button>
 
-    <!-- Preload images -->
-    <img id="img1" crossorigin="anonymous" src="Images/sechelt.jpg" style="display:none" />
-    <img id="img2" crossorigin="anonymous" src="Images/malta.jpg" style="display:none" />
-    <img id="img3" crossorigin="anonymous" src="Images/swiss.jpg" style="display:none" />
-    <img id="img4" crossorigin="anonymous" src="Images/temple.jpg" style="display:none" />
-
     <a-scene>
       <a-assets>
-        <img id="pano1" src="#img1" />
-        <img id="pano2" src="#img2" />
-        <img id="pano3" src="#img3" />
-        <img id="pano4" src="#img4" />
+        <img id="pano1" crossorigin="anonymous" src="Images/sechelt.jpg" />
+        <img id="pano2" crossorigin="anonymous" src="Images/malta.jpg" />
+        <img id="pano3" crossorigin="anonymous" src="Images/swiss.jpg" />
+        <img id="pano4" crossorigin="anonymous" src="Images/temple.jpg" />
       </a-assets>
+
       <a-sky id="sky" rotation="0 -130 0"></a-sky>
     </a-scene>
 
     <script>
       const images = [
-        { name: "Sechelt", id: "#img1" },
-        { name: "Malta Bay", id: "#img2" },
-        { name: "Swiss Alps", id: "#img3" },
-        { name: "Temple Interior", id: "#img4" },
+        { name: "Sechelt", id: "#pano1" },
+        { name: "Malta Bay", id: "#pano2" },
+        { name: "Swiss Alps", id: "#pano3" },
+        { name: "Temple Interior", id: "#pano4" },
       ];
 
       let current = 0;
