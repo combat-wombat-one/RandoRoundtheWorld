@@ -65,9 +65,10 @@
   <div id="mapContainer"><div id="map"></div></div>
   <div id="infoPanel"></div>
 
-  <a-scene>
+  <a-scene vr-mode-ui="enabled: true">
     <a-assets id="assetsContainer"></a-assets>
     <a-sky id="sky" rotation="0 -130 0"></a-sky>
+    <a-entity camera look-controls="magicWindowTrackingEnabled: true" position="0 1.6 0"></a-entity>
   </a-scene>
 
   <script>
@@ -198,6 +199,13 @@
           loadSky(locations[current].filename);
         }
       });
+
+      // Permission request for iOS/Android motion sensors
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission().catch(() => {
+          alert("📱 Motion access denied. Enable motion tracking for gyroscope support.");
+        });
+      }
     }
 
     setupMap();
