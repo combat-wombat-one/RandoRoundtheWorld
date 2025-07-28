@@ -3,14 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <title>V4 360° GeoGuess Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; }
-
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
     button {
       position: absolute;
       top: 20px;
@@ -22,12 +24,11 @@
       border-radius: 5px;
       z-index: 1001;
     }
-
     #nextBtn { left: 20px; }
     #removeBtn { left: 160px; }
     #submitBtn { left: 300px; }
     #consoleBtn { left: 460px; }
-
+    #enterVRBtn { left: 600px; }
     #mapContainer {
       position: absolute;
       bottom: 20px;
@@ -37,26 +38,23 @@
       border: 2px solid #ccc;
       z-index: 1000;
     }
-
     #map {
       width: 100%;
       height: 100%;
     }
-
     #infoPanel {
       position: absolute;
       right: 20px;
       top: 20px;
-      background: rgba(255,255,255,0.95);
+      background: rgba(255, 255, 255, 0.95);
       border-radius: 10px;
       padding: 15px 20px;
       font-family: sans-serif;
       font-size: 16px;
       z-index: 1001;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
       display: none;
     }
-
     #consoleLog {
       position: absolute;
       bottom: 0;
@@ -72,7 +70,6 @@
       display: none;
       z-index: 1002;
     }
-
     #versionWatermark {
       position: absolute;
       bottom: 5px;
@@ -89,21 +86,33 @@
   <button id="removeBtn">🗑 Remove Pin</button>
   <button id="submitBtn">✅ Submit Guess</button>
   <button id="consoleBtn">🖥️ Show Console</button>
+  <button id="enterVRBtn">🎮 Enter VR</button>
 
   <div id="mapContainer"><div id="map"></div></div>
   <div id="infoPanel"></div>
   <div id="consoleLog"></div>
   <div id="versionWatermark">Version 1.2.0</div>
 
-  <a-scene vr-mode-ui="enabled: true">
+  <a-scene
+    embedded
+    xr-mode="immersive-vr"
+    vr-mode-ui="enabled: true"
+    loading-screen="enabled: true"
+    renderer="colorManagement: true; physicallyCorrectLights: true"
+  >
     <a-assets id="assetsContainer"></a-assets>
     <a-sky id="sky" rotation="0 -130 0"></a-sky>
-    <a-entity camera look-controls="magicWindowTrackingEnabled: true" position="0 1.6 0"></a-entity>
+
+    <!-- Explicit camera rig -->
+    <a-entity id="cameraRig" position="0 1.6 0">
+      <a-camera wasd-controls-enabled="false" look-controls="enabled: true"></a-camera>
+    </a-entity>
   </a-scene>
 
   <script>
+    // Console log override to also print to onscreen div
     const originalConsoleLog = console.log;
-    console.log = function(...args) {
+    console.log = function (...args) {
       const logContainer = document.getElementById("consoleLog");
       if (logContainer) {
         logContainer.innerHTML += args.join(" ") + "<br>";
@@ -114,7 +123,25 @@
 
     document.getElementById("consoleBtn").addEventListener("click", () => {
       const logContainer = document.getElementById("consoleLog");
-      logContainer.style.display = (logContainer.style.display === "none") ? "block" : "none";
+      logContainer.style.display = logContainer.style.display === "none" ? "block" : "none";
+    });
+
+    document.getElementById("enterVRBtn").addEventListener("click", async () => {
+      const sceneEl = document.querySelector("a-scene");
+      if (sceneEl) {
+        try {
+          if (!sceneEl.is("vr-mode")) {
+            await sceneEl.enterVR();
+            console.log("Entered VR mode");
+          } else {
+            await sceneEl.exitVR();
+            console.log("Exited VR mode");
+          }
+        } catch (e) {
+          console.error("Error entering/exiting VR:", e);
+          alert("Failed to enter VR: " + e.message);
+        }
+      }
     });
 
     let locations = [];
@@ -137,29 +164,40 @@
     }
 
     function clearMapObjects() {
-      if (marker) { map.removeLayer(marker); marker = null; }
-      if (trueMarker) { map.removeLayer(trueMarker); trueMarker = null; }
-      if (line) { map.removeLayer(line); line = null; }
+      if (marker) {
+        map.removeLayer(marker);
+        marker = null;
+      }
+      if (trueMarker) {
+        map.removeLayer(trueMarker);
+        trueMarker = null;
+      }
+      if (line) {
+        map.removeLayer(line);
+        line = null;
+      }
     }
 
     function distanceInKm(lat1, lon1, lat2, lon2) {
       const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) ** 2 +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) ** 2;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2;
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
 
     function setupMap() {
-      map = L.map('map').setView([20, 0], 2);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+      map = L.map("map").setView([20, 0], 2);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
       }).addTo(map);
 
-      map.on('click', function(e) {
+      map.on("click", function (e) {
         if (marker) map.removeLayer(marker);
         marker = L.marker(e.latlng).addTo(map);
       });
@@ -169,7 +207,10 @@
       document.getElementById("nextBtn").addEventListener("click", loadNextScene);
 
       document.getElementById("removeBtn").addEventListener("click", () => {
-        if (marker) { map.removeLayer(marker); marker = null; }
+        if (marker) {
+          map.removeLayer(marker);
+          marker = null;
+        }
       });
 
       document.getElementById("submitBtn").addEventListener("click", () => {
@@ -180,26 +221,34 @@
 
         const guess = marker.getLatLng();
         const actual = locations[current];
-        const dist = distanceInKm(guess.lat, guess.lng, actual.latitude, actual.longitude);
+        const dist = distanceInKm(
+          guess.lat,
+          guess.lng,
+          actual.latitude,
+          actual.longitude
+        );
         const score = Math.max(0, Math.round(5000 - dist * 100));
 
         if (trueMarker) map.removeLayer(trueMarker);
         trueMarker = L.marker([actual.latitude, actual.longitude], {
           icon: L.icon({
-            iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+            iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
             iconSize: [32, 32],
-            iconAnchor: [16, 32]
-          })
+            iconAnchor: [16, 32],
+          }),
         }).addTo(map);
 
         if (line) map.removeLayer(line);
-        line = L.polyline([
-          [guess.lat, guess.lng],
-          [actual.latitude, actual.longitude]
-        ], {
-          color: 'red',
-          weight: 3
-        }).addTo(map);
+        line = L.polyline(
+          [
+            [guess.lat, guess.lng],
+            [actual.latitude, actual.longitude],
+          ],
+          {
+            color: "red",
+            weight: 3,
+          }
+        ).addTo(map);
 
         const panel = document.getElementById("infoPanel");
         panel.innerHTML = `
@@ -207,13 +256,13 @@
           <strong>📍 Distance:</strong> ${dist.toFixed(2)} km<br>
           <strong>🎯 Score:</strong> ${score} / 5000
         `;
-        panel.style.display = 'block';
+        panel.style.display = "block";
       });
     }
 
     function preloadImages() {
       const assets = document.getElementById("assetsContainer");
-      locations.forEach(loc => {
+      locations.forEach((loc) => {
         const img = document.createElement("img");
         img.setAttribute("id", `img-${loc.filename}`);
         img.setAttribute("src", `Images/${loc.filename}`);
@@ -228,40 +277,61 @@
         download: true,
         header: true,
         complete: (results) => {
-          locations = results.data.map(row => ({
-            filename: row.filename,
-            latitude: parseFloat(row.latitude),
-            longitude: parseFloat(row.longitude)
-          })).filter(loc => !isNaN(loc.latitude) && !isNaN(loc.longitude));
+          locations = results.data
+            .map((row) => ({
+              filename: row.filename,
+              latitude: parseFloat(row.latitude),
+              longitude: parseFloat(row.longitude),
+            }))
+            .filter((loc) => !isNaN(loc.latitude) && !isNaN(loc.longitude));
           if (locations.length === 0) {
             alert("⚠️ No valid data in CSV.");
             return;
           }
           preloadImages();
           loadSky(locations[current].filename);
-        }
+        },
       });
 
-      // Permission request for iOS/Android motion sensors
-      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      // Motion permissions request for iOS/Android (necessary for VR sensors)
+      if (
+        typeof DeviceMotionEvent !== "undefined" &&
+        typeof DeviceMotionEvent.requestPermission === "function"
+      ) {
         DeviceMotionEvent.requestPermission()
-          .then(response => {
+          .then((response) => {
             console.log("Motion permission response:", response);
+            if (response !== "granted") {
+              alert(
+                "📱 Motion access denied. Enable motion tracking for gyroscope support."
+              );
+            }
           })
-          .catch(err => {
+          .catch((err) => {
             console.log("Motion permission error:", err);
-            alert("📱 Motion access denied. Enable motion tracking for gyroscope support.");
+            alert(
+              "📱 Motion access denied. Enable motion tracking for gyroscope support."
+            );
           });
       } else {
         console.log("DeviceMotionEvent.requestPermission not available");
       }
 
-      if (typeof DeviceOrientationEvent !== 'undefined') {
+      if (typeof DeviceOrientationEvent !== "undefined") {
         window.addEventListener("deviceorientation", (e) => {
-          console.log("DeviceOrientation: ", e.alpha, e.beta, e.gamma);
+          console.log("DeviceOrientation:", e.alpha, e.beta, e.gamma);
         });
       } else {
         console.log("DeviceOrientationEvent not supported.");
+      }
+
+      // WebXR availability check for debugging
+      if (navigator.xr) {
+        navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
+          console.log("immersive-vr supported:", supported);
+        });
+      } else {
+        console.log("WebXR not supported by this browser.");
       }
     }
 
