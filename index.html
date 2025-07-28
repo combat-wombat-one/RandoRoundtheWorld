@@ -2,11 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Basic 360° Image Viewer with VR UI</title>
+  <title>360° Image Viewer with VR UI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
   <style>
     html, body {
       margin: 0; height: 100%; overflow: hidden; background: #111; font-family: sans-serif;
@@ -50,7 +49,6 @@
     </a-entity>
   </a-entity>
 
-  <!-- Next Image Button -->
   <a-plane id="nextBtn" class="clickable" position="0 1 -2" width="0.8" height="0.3" material="color: #4CAF50"
            event-set__enter="_event: mouseenter; material.color: #66BB6A"
            event-set__leave="_event: mouseleave; material.color: #4CAF50"
@@ -69,15 +67,21 @@
   let images = [];
   let currentIndex = 0;
 
+  function log(...args) {
+    console.log('[360 Viewer]', ...args);
+  }
+
   // Load CSV and preload images
   function loadImagesCSV() {
     return new Promise((resolve, reject) => {
-      Papa.parse('locations.csv', {  // Make sure the CSV is named 'images.csv' with a 'filename' header
+      log('Loading CSV...');
+      Papa.parse('locations.csv', {
         download: true,
         header: true,
         complete: (results) => {
+          log('CSV loaded', results.data);
           images = results.data
-            .map(row => row.filename)
+            .map(row => row.filename)       // Only pick the filename field
             .filter(name => name && name.trim() !== '');
           if (images.length === 0) {
             reject('No images found in CSV.');
@@ -93,17 +97,33 @@
   // Preload images as assets in A-Frame
   function preloadImages(filenames) {
     return new Promise((resolve) => {
+      let loadedCount = 0;
       filenames.forEach(name => {
-        const imgId = name.replace(/\.[^/.]+$/, '').toLowerCase();  // Remove extension and lowercase
+        const imgId = name.replace(/\.[^/.]+$/, '').toLowerCase();
         if (!document.getElementById(imgId)) {
           const imgEl = document.createElement('img');
           imgEl.setAttribute('id', imgId);
           imgEl.setAttribute('src', `Images/${name}`);
+
+          imgEl.addEventListener('load', () => {
+            loadedCount++;
+            log(`Image loaded: ${name} (${loadedCount}/${filenames.length})`);
+            if (loadedCount === filenames.length) resolve();
+          });
+          imgEl.addEventListener('error', () => {
+            log(`Error loading image: ${name}`);
+            loadedCount++;
+            if (loadedCount === filenames.length) resolve();
+          });
+
           assetsContainer.appendChild(imgEl);
+        } else {
+          loadedCount++;
+          if (loadedCount === filenames.length) resolve();
         }
       });
-      // Wait a moment to let images load
-      setTimeout(resolve, 700);
+
+      if (filenames.length === 0) resolve();
     });
   }
 
@@ -111,8 +131,18 @@
   function loadCurrentImage() {
     const filename = images[currentIndex];
     const imgId = filename.replace(/\.[^/.]+$/, '').toLowerCase();
+    log('Setting sky to:', imgId, `#${imgId}`, `Images/${filename}`);
     sky.setAttribute('src', `#${imgId}`);
-    console.log('Loaded image:', filename);
+
+    // Fallback if needed
+    setTimeout(() => {
+      const skySrc = sky.getAttribute('src');
+      log('Current sky src:', skySrc);
+      if (skySrc !== `#${imgId}`) {
+        log('Sky src not properly set, applying fallback direct src');
+        sky.setAttribute('src', `Images/${filename}`);
+      }
+    }, 2000);
   }
 
   // Next image button handler
@@ -122,7 +152,6 @@
   }
 
   function setupVRUI() {
-    // Attach click handler after scene fully loaded
     nextBtn.addEventListener('click', onNextImage);
   }
 
