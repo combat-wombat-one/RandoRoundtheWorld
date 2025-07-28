@@ -2,17 +2,38 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>V5 360° GeoGuess Game - In-VR UI</title>
+  <title>V1.6.0 360° GeoGuess Game - In-VR UI with Start</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
-    /* Hide the original HTML buttons and map, we use VR UI instead */
-    body, html { margin: 0; overflow: hidden; }
+    html, body {
+      margin: 0; 
+      overflow: hidden; 
+      height: 100%;
+      background: black;
+      font-family: sans-serif;
+    }
+
+    #startButton {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      padding: 20px 40px;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      z-index: 9999;
+      user-select: none;
+    }
+
+    /* Hide the original HTML buttons and map - we use VR UI instead */
     #mapContainer, #nextBtn, #removeBtn, #submitBtn, #consoleBtn, #infoPanel, #consoleLog, #versionWatermark {
       display: none !important;
     }
@@ -20,14 +41,16 @@
 </head>
 <body>
 
+  <button id="startButton">▶ Start Game</button>
+
   <!-- A-Frame Scene -->
-  <a-scene embedded vr-mode-ui="enabled: true" background="color: black" cursor="rayOrigin: mouse" raycaster="objects: .clickable">
+  <a-scene embedded vr-mode-ui="enabled: false" background="color: black" visible="false" id="vrScene" cursor="rayOrigin: mouse" raycaster="objects: .clickable">
 
     <!-- Assets container -->
     <a-assets id="assetsContainer"></a-assets>
 
-    <!-- 360 sky panorama -->
-    <a-sky id="sky" rotation="0 -130 0"></a-sky>
+    <!-- 360 sky panorama, default black or placeholder -->
+    <a-sky id="sky" color="#000000" rotation="0 -130 0"></a-sky>
 
     <!-- Camera with cursor -->
     <a-entity id="cameraRig" position="0 1.6 0">
@@ -46,7 +69,7 @@
     </a-entity>
 
     <!-- UI Panel for Buttons -->
-    <a-entity id="uiPanel" position="0 1.2 -1.5" rotation="0 0 0" geometry="primitive: plane; height: 0.4; width: 1.6" material="color: #222; opacity: 0.8" >
+    <a-entity id="uiPanel" position="0 1.2 -1.5" geometry="primitive: plane; height: 0.4; width: 1.6" material="color: #222; opacity: 0.8" >
       
       <!-- Next Location Button -->
       <a-plane id="nextBtn" class="clickable" position="-0.6 0 0.01" width="0.45" height="0.15" material="color: #4CAF50" 
@@ -75,65 +98,22 @@
       <a-text id="infoText" value="" align="center" color="#eee" width="2" position="0 0 0.01"></a-text>
     </a-entity>
 
-    <!-- Map Panel (iframe embedding Leaflet) -->
-    <a-entity id="mapPanel" position="1.6 1.2 -2" geometry="primitive: plane; width: 1.6; height: 1" material="shader: html; target: #mapIframe;" visible="true" 
-      rotation="0 -20 0" class="clickable">
-    </a-entity>
-
   </a-scene>
 
-  <!-- Hidden iframe for Leaflet map (used as texture) -->
-  <iframe id="mapIframe" srcdoc='
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-      <style>html, body, #map { height: 100%; margin: 0; }</style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        var map = L.map("map").setView([20, 0], 2);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "© OpenStreetMap contributors"
-        }).addTo(map);
-        var marker = null;
-        document.body.addEventListener("click", function(event) {
-          // You can implement communication back to main page here if needed
-        });
-      </script>
-    </body>
-    </html>
-  ' style="width:800px; height:500px; border:none; display:none;"></iframe>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <script>
-    // Polyfill for aframe-html-shader to map iframe as texture (you can include aframe-html-shader lib if you want)
-    // For now we just keep the iframe and display the map in separate window if needed
+    const startButton = document.getElementById('startButton');
+    const vrScene = document.getElementById('vrScene');
+    const sky = document.getElementById('sky');
+    const infoPanel = document.getElementById('infoPanel');
+    const infoText = document.getElementById('infoText');
 
     let locations = [];
     let current = 0;
     let markerLatLng = null;
     let trueLatLng = null;
-
-    const sky = document.getElementById('sky');
-    const infoPanel = document.getElementById('infoPanel');
-    const infoText = document.getElementById('infoText');
-
-    function loadSky(filename) {
-      sky.setAttribute('src', `Images/${filename}`);
-    }
-
-    function distanceInKm(lat1, lon1, lat2, lon2) {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) ** 2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
-    }
 
     // Load locations from CSV
     function initLocations() {
@@ -155,60 +135,100 @@
       });
     }
 
-    // Button handlers
-    document.getElementById('nextBtn').addEventListener('click', () => {
-      current = (current + 1) % locations.length;
-      loadSky(locations[current].filename);
-      infoPanel.setAttribute('visible', false);
-      markerLatLng = null;
-      trueLatLng = null;
-      console.log('Next location:', locations[current]);
-    });
+    // Load sky image
+    function loadSky(filename) {
+      sky.setAttribute('src', `Images/${filename}`);
+    }
 
-    document.getElementById('removeBtn').addEventListener('click', () => {
-      markerLatLng = null;
-      infoPanel.setAttribute('visible', false);
-      console.log('Pin removed');
-    });
+    // Calculate distance between two lat/lng points
+    function distanceInKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
 
-    document.getElementById('submitBtn').addEventListener('click', () => {
-      if (!markerLatLng) {
-        alert("❗ Please drop a pin first.");
+    // Button event handlers
+    function setupButtonHandlers() {
+      document.getElementById('nextBtn').addEventListener('click', () => {
+        current = (current + 1) % locations.length;
+        loadSky(locations[current].filename);
+        infoPanel.setAttribute('visible', false);
+        markerLatLng = null;
+        trueLatLng = null;
+        console.log('Next location:', locations[current]);
+      });
+
+      document.getElementById('removeBtn').addEventListener('click', () => {
+        markerLatLng = null;
+        infoPanel.setAttribute('visible', false);
+        console.log('Pin removed');
+      });
+
+      document.getElementById('submitBtn').addEventListener('click', () => {
+        if (!markerLatLng) {
+          alert("❗ Please drop a pin first.");
+          return;
+        }
+
+        const actual = locations[current];
+        const dist = distanceInKm(markerLatLng.lat, markerLatLng.lng, actual.latitude, actual.longitude);
+        const score = Math.max(0, Math.round(5000 - dist * 100));
+
+        trueLatLng = { lat: actual.latitude, lng: actual.longitude };
+
+        infoText.setAttribute('value', `📸 Image: ${actual.filename}\n📍 Distance: ${dist.toFixed(2)} km\n🎯 Score: ${score} / 5000`);
+        infoPanel.setAttribute('visible', true);
+        console.log('Submit guess:', markerLatLng, 'Actual:', trueLatLng, 'Distance:', dist);
+      });
+    }
+
+    // Setup click on VR scene to place marker (simplified)
+    function setupMarkerPlacement() {
+      const scene = document.querySelector('a-scene');
+      scene.addEventListener('click', (evt) => {
+        if (evt.detail && evt.detail.intersection) {
+          const point = evt.detail.intersection.point;
+          // For demo: we approximate lat/lng from x,z coords of point
+          markerLatLng = { lat: point.z, lng: point.x };
+          infoPanel.setAttribute('visible', false);
+          console.log('Marker set at:', markerLatLng);
+        }
+      });
+    }
+
+    startButton.addEventListener('click', () => {
+      // Hide start button
+      startButton.style.display = 'none';
+
+      // Show VR scene
+      vrScene.setAttribute('visible', true);
+
+      // Initialize the game logic
+      initLocations();
+      setupButtonHandlers();
+      setupMarkerPlacement();
+
+      // Enter immersive VR mode
+      if (vrScene.xrSession) {
+        // Already in session
         return;
       }
-
-      const actual = locations[current];
-      const dist = distanceInKm(markerLatLng.lat, markerLatLng.lng, actual.latitude, actual.longitude);
-      const score = Math.max(0, Math.round(5000 - dist * 100));
-
-      trueLatLng = { lat: actual.latitude, lng: actual.longitude };
-
-      infoText.setAttribute('value', `📸 Image: ${actual.filename}
-📍 Distance: ${dist.toFixed(2)} km
-🎯 Score: ${score} / 5000`);
-      infoPanel.setAttribute('visible', true);
-      console.log('Submit guess:', markerLatLng, 'Actual:', trueLatLng, 'Distance:', dist);
-    });
-
-    // Listen for clicks in VR scene to pick marker location
-    // We do this by raycasting intersection on a ground plane or sphere. For simplicity, let's add a listener on scene click:
-
-    const scene = document.querySelector('a-scene');
-    scene.addEventListener('click', (evt) => {
-      // The event.detail.intersection.point gives the clicked 3D position
-      if (evt.detail && evt.detail.intersection) {
-        const point = evt.detail.intersection.point;
-        // Convert 3D point to lat/lng (this requires your own mapping; here simplified)
-        // For demo, let's pretend x = lng, z = lat, scaled arbitrarily:
-        markerLatLng = { lat: point.z, lng: point.x };
-        infoPanel.setAttribute('visible', false);
-        console.log('Marker set at:', markerLatLng);
+      if (navigator.xr) {
+        navigator.xr.requestSession('immersive-vr').then((session) => {
+          vrScene.renderer.xr.setSession(session);
+        }).catch(err => {
+          console.warn('Failed to enter immersive VR:', err);
+          alert('Failed to enter immersive VR: ' + err.message);
+        });
+      } else {
+        // fallback to standard fullscreen
+        vrScene.enterVR();
       }
-    });
-
-    // Initialize
-    window.addEventListener('load', () => {
-      initLocations();
     });
   </script>
 </body>
