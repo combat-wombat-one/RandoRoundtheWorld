@@ -83,7 +83,7 @@
   // Load CSV and preload images
   function loadImagesCSV() {
     return new Promise((resolve, reject) => {
-      Papa.parse('images.csv', {
+      Papa.parse('locations.csv', {
         download: true,
         header: true,
         complete: (results) => {
