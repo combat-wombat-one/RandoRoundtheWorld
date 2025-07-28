@@ -2,342 +2,214 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>V4 360° GeoGuess Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>V5 360° GeoGuess Game - In-VR UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-    }
-    button {
-      position: absolute;
-      top: 20px;
-      padding: 10px 20px;
-      background: white;
-      border: none;
-      font-size: 16px;
-      cursor: pointer;
-      border-radius: 5px;
-      z-index: 1001;
-    }
-    #nextBtn { left: 20px; }
-    #removeBtn { left: 160px; }
-    #submitBtn { left: 300px; }
-    #consoleBtn { left: 460px; }
-    #enterVRBtn { left: 600px; }
-    #mapContainer {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      width: 400px;
-      height: 300px;
-      border: 2px solid #ccc;
-      z-index: 1000;
-    }
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-    #infoPanel {
-      position: absolute;
-      right: 20px;
-      top: 20px;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 10px;
-      padding: 15px 20px;
-      font-family: sans-serif;
-      font-size: 16px;
-      z-index: 1001;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-      display: none;
-    }
-    #consoleLog {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      width: 400px;
-      height: 200px;
-      background: rgba(0, 0, 0, 0.8);
-      color: #0f0;
-      font-family: monospace;
-      font-size: 12px;
-      overflow-y: scroll;
-      padding: 10px;
-      display: none;
-      z-index: 1002;
-    }
-    #versionWatermark {
-      position: absolute;
-      bottom: 5px;
-      right: 10px;
-      font-size: 12px;
-      color: #999;
-      z-index: 1000;
-      font-family: sans-serif;
+    /* Hide the original HTML buttons and map, we use VR UI instead */
+    body, html { margin: 0; overflow: hidden; }
+    #mapContainer, #nextBtn, #removeBtn, #submitBtn, #consoleBtn, #infoPanel, #consoleLog, #versionWatermark {
+      display: none !important;
     }
   </style>
 </head>
 <body>
-  <button id="nextBtn">🎲 Next Location</button>
-  <button id="removeBtn">🗑 Remove Pin</button>
-  <button id="submitBtn">✅ Submit Guess</button>
-  <button id="consoleBtn">🖥️ Show Console</button>
-  <button id="enterVRBtn">🎮 Enter VR</button>
 
-  <div id="mapContainer"><div id="map"></div></div>
-  <div id="infoPanel"></div>
-  <div id="consoleLog"></div>
-  <div id="versionWatermark">Version 1.2.0</div>
+  <!-- A-Frame Scene -->
+  <a-scene embedded vr-mode-ui="enabled: true" background="color: black" cursor="rayOrigin: mouse" raycaster="objects: .clickable">
 
-  <a-scene
-    embedded
-    xr-mode="immersive-vr"
-    vr-mode-ui="enabled: true"
-    loading-screen="enabled: true"
-    renderer="colorManagement: true; physicallyCorrectLights: true"
-  >
+    <!-- Assets container -->
     <a-assets id="assetsContainer"></a-assets>
+
+    <!-- 360 sky panorama -->
     <a-sky id="sky" rotation="0 -130 0"></a-sky>
 
-    <!-- Explicit camera rig -->
+    <!-- Camera with cursor -->
     <a-entity id="cameraRig" position="0 1.6 0">
-      <a-camera wasd-controls-enabled="false" look-controls="enabled: true"></a-camera>
+      <a-entity camera look-controls wasd-controls>
+        <a-cursor
+          id="cursor"
+          fuse="true"
+          fuse-timeout="1500"
+          raycaster="objects: .clickable"
+          material="color: cyan; shader: flat"
+          geometry="radiusInner: 0.005; radiusOuter: 0.015"
+          position="0 0 -1"
+          >
+        </a-cursor>
+      </a-entity>
     </a-entity>
+
+    <!-- UI Panel for Buttons -->
+    <a-entity id="uiPanel" position="0 1.2 -1.5" rotation="0 0 0" geometry="primitive: plane; height: 0.4; width: 1.6" material="color: #222; opacity: 0.8" >
+      
+      <!-- Next Location Button -->
+      <a-plane id="nextBtn" class="clickable" position="-0.6 0 0.01" width="0.45" height="0.15" material="color: #4CAF50" 
+               event-set__enter="_event: mouseenter; material.color: #66BB6A" 
+               event-set__leave="_event: mouseleave; material.color: #4CAF50">
+        <a-text value="🎲 Next Location" align="center" color="white" position="0 0 0.01" width="3"></a-text>
+      </a-plane>
+
+      <!-- Remove Pin Button -->
+      <a-plane id="removeBtn" class="clickable" position="0 0 0.01" width="0.45" height="0.15" material="color: #F44336"
+               event-set__enter="_event: mouseenter; material.color: #EF5350"
+               event-set__leave="_event: mouseleave; material.color: #F44336">
+        <a-text value="🗑 Remove Pin" align="center" color="white" position="0 0 0.01" width="3"></a-text>
+      </a-plane>
+
+      <!-- Submit Guess Button -->
+      <a-plane id="submitBtn" class="clickable" position="0.6 0 0.01" width="0.45" height="0.15" material="color: #2196F3"
+               event-set__enter="_event: mouseenter; material.color: #42A5F5"
+               event-set__leave="_event: mouseleave; material.color: #2196F3">
+        <a-text value="✅ Submit Guess" align="center" color="white" position="0 0 0.01" width="3"></a-text>
+      </a-plane>
+    </a-entity>
+
+    <!-- Info Panel -->
+    <a-entity id="infoPanel" position="0 0.7 -1.5" geometry="primitive: plane; height: 0.5; width: 1.6" material="color: #111; opacity: 0.8" visible="false">
+      <a-text id="infoText" value="" align="center" color="#eee" width="2" position="0 0 0.01"></a-text>
+    </a-entity>
+
+    <!-- Map Panel (iframe embedding Leaflet) -->
+    <a-entity id="mapPanel" position="1.6 1.2 -2" geometry="primitive: plane; width: 1.6; height: 1" material="shader: html; target: #mapIframe;" visible="true" 
+      rotation="0 -20 0" class="clickable">
+    </a-entity>
+
   </a-scene>
 
+  <!-- Hidden iframe for Leaflet map (used as texture) -->
+  <iframe id="mapIframe" srcdoc='
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>html, body, #map { height: 100%; margin: 0; }</style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map("map").setView([20, 0], 2);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap contributors"
+        }).addTo(map);
+        var marker = null;
+        document.body.addEventListener("click", function(event) {
+          // You can implement communication back to main page here if needed
+        });
+      </script>
+    </body>
+    </html>
+  ' style="width:800px; height:500px; border:none; display:none;"></iframe>
+
   <script>
-    // Console log override to also print to onscreen div
-    const originalConsoleLog = console.log;
-    console.log = function (...args) {
-      const logContainer = document.getElementById("consoleLog");
-      if (logContainer) {
-        logContainer.innerHTML += args.join(" ") + "<br>";
-        logContainer.scrollTop = logContainer.scrollHeight;
-      }
-      originalConsoleLog.apply(console, args);
-    };
-
-    document.getElementById("consoleBtn").addEventListener("click", () => {
-      const logContainer = document.getElementById("consoleLog");
-      logContainer.style.display = logContainer.style.display === "none" ? "block" : "none";
-    });
-
-    document.getElementById("enterVRBtn").addEventListener("click", async () => {
-      const sceneEl = document.querySelector("a-scene");
-      if (sceneEl) {
-        try {
-          if (!sceneEl.is("vr-mode")) {
-            await sceneEl.enterVR();
-            console.log("Entered VR mode");
-          } else {
-            await sceneEl.exitVR();
-            console.log("Exited VR mode");
-          }
-        } catch (e) {
-          console.error("Error entering/exiting VR:", e);
-          alert("Failed to enter VR: " + e.message);
-        }
-      }
-    });
+    // Polyfill for aframe-html-shader to map iframe as texture (you can include aframe-html-shader lib if you want)
+    // For now we just keep the iframe and display the map in separate window if needed
 
     let locations = [];
     let current = 0;
-    let marker = null;
-    let trueMarker = null;
-    let line = null;
-    let map;
+    let markerLatLng = null;
+    let trueLatLng = null;
+
+    const sky = document.getElementById('sky');
+    const infoPanel = document.getElementById('infoPanel');
+    const infoText = document.getElementById('infoText');
 
     function loadSky(filename) {
-      const sky = document.getElementById("sky");
-      sky.setAttribute("src", `Images/${filename}`);
-    }
-
-    function loadNextScene() {
-      current = (current + 1) % locations.length;
-      loadSky(locations[current].filename);
-      clearMapObjects();
-      document.getElementById("infoPanel").style.display = "none";
-    }
-
-    function clearMapObjects() {
-      if (marker) {
-        map.removeLayer(marker);
-        marker = null;
-      }
-      if (trueMarker) {
-        map.removeLayer(trueMarker);
-        trueMarker = null;
-      }
-      if (line) {
-        map.removeLayer(line);
-        line = null;
-      }
+      sky.setAttribute('src', `Images/${filename}`);
     }
 
     function distanceInKm(lat1, lon1, lat2, lon2) {
       const R = 6371;
-      const dLat = ((lat2 - lat1) * Math.PI) / 180;
-      const dLon = ((lon2 - lon1) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((lat1 * Math.PI) / 180) *
-          Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLon / 2) ** 2;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       return R * c;
     }
 
-    function setupMap() {
-      map = L.map("map").setView([20, 0], 2);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-      }).addTo(map);
-
-      map.on("click", function (e) {
-        if (marker) map.removeLayer(marker);
-        marker = L.marker(e.latlng).addTo(map);
-      });
-    }
-
-    function setupButtons() {
-      document.getElementById("nextBtn").addEventListener("click", loadNextScene);
-
-      document.getElementById("removeBtn").addEventListener("click", () => {
-        if (marker) {
-          map.removeLayer(marker);
-          marker = null;
-        }
-      });
-
-      document.getElementById("submitBtn").addEventListener("click", () => {
-        if (!marker) {
-          alert("❗ Please drop a pin first.");
-          return;
-        }
-
-        const guess = marker.getLatLng();
-        const actual = locations[current];
-        const dist = distanceInKm(
-          guess.lat,
-          guess.lng,
-          actual.latitude,
-          actual.longitude
-        );
-        const score = Math.max(0, Math.round(5000 - dist * 100));
-
-        if (trueMarker) map.removeLayer(trueMarker);
-        trueMarker = L.marker([actual.latitude, actual.longitude], {
-          icon: L.icon({
-            iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
-            iconSize: [32, 32],
-            iconAnchor: [16, 32],
-          }),
-        }).addTo(map);
-
-        if (line) map.removeLayer(line);
-        line = L.polyline(
-          [
-            [guess.lat, guess.lng],
-            [actual.latitude, actual.longitude],
-          ],
-          {
-            color: "red",
-            weight: 3,
-          }
-        ).addTo(map);
-
-        const panel = document.getElementById("infoPanel");
-        panel.innerHTML = `
-          <strong>📸 Image:</strong> ${actual.filename}<br>
-          <strong>📍 Distance:</strong> ${dist.toFixed(2)} km<br>
-          <strong>🎯 Score:</strong> ${score} / 5000
-        `;
-        panel.style.display = "block";
-      });
-    }
-
-    function preloadImages() {
-      const assets = document.getElementById("assetsContainer");
-      locations.forEach((loc) => {
-        const img = document.createElement("img");
-        img.setAttribute("id", `img-${loc.filename}`);
-        img.setAttribute("src", `Images/${loc.filename}`);
-        img.setAttribute("crossorigin", "anonymous");
-        img.style.display = "none";
-        assets.appendChild(img);
-      });
-    }
-
-    function init() {
+    // Load locations from CSV
+    function initLocations() {
       Papa.parse("locations.csv", {
         download: true,
         header: true,
         complete: (results) => {
-          locations = results.data
-            .map((row) => ({
-              filename: row.filename,
-              latitude: parseFloat(row.latitude),
-              longitude: parseFloat(row.longitude),
-            }))
-            .filter((loc) => !isNaN(loc.latitude) && !isNaN(loc.longitude));
+          locations = results.data.map(row => ({
+            filename: row.filename,
+            latitude: parseFloat(row.latitude),
+            longitude: parseFloat(row.longitude)
+          })).filter(loc => !isNaN(loc.latitude) && !isNaN(loc.longitude));
           if (locations.length === 0) {
             alert("⚠️ No valid data in CSV.");
             return;
           }
-          preloadImages();
           loadSky(locations[current].filename);
-        },
+        }
       });
-
-      // Motion permissions request for iOS/Android (necessary for VR sensors)
-      if (
-        typeof DeviceMotionEvent !== "undefined" &&
-        typeof DeviceMotionEvent.requestPermission === "function"
-      ) {
-        DeviceMotionEvent.requestPermission()
-          .then((response) => {
-            console.log("Motion permission response:", response);
-            if (response !== "granted") {
-              alert(
-                "📱 Motion access denied. Enable motion tracking for gyroscope support."
-              );
-            }
-          })
-          .catch((err) => {
-            console.log("Motion permission error:", err);
-            alert(
-              "📱 Motion access denied. Enable motion tracking for gyroscope support."
-            );
-          });
-      } else {
-        console.log("DeviceMotionEvent.requestPermission not available");
-      }
-
-      if (typeof DeviceOrientationEvent !== "undefined") {
-        window.addEventListener("deviceorientation", (e) => {
-          console.log("DeviceOrientation:", e.alpha, e.beta, e.gamma);
-        });
-      } else {
-        console.log("DeviceOrientationEvent not supported.");
-      }
-
-      // WebXR availability check for debugging
-      if (navigator.xr) {
-        navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
-          console.log("immersive-vr supported:", supported);
-        });
-      } else {
-        console.log("WebXR not supported by this browser.");
-      }
     }
 
-    setupMap();
-    setupButtons();
-    window.addEventListener("load", init);
+    // Button handlers
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      current = (current + 1) % locations.length;
+      loadSky(locations[current].filename);
+      infoPanel.setAttribute('visible', false);
+      markerLatLng = null;
+      trueLatLng = null;
+      console.log('Next location:', locations[current]);
+    });
+
+    document.getElementById('removeBtn').addEventListener('click', () => {
+      markerLatLng = null;
+      infoPanel.setAttribute('visible', false);
+      console.log('Pin removed');
+    });
+
+    document.getElementById('submitBtn').addEventListener('click', () => {
+      if (!markerLatLng) {
+        alert("❗ Please drop a pin first.");
+        return;
+      }
+
+      const actual = locations[current];
+      const dist = distanceInKm(markerLatLng.lat, markerLatLng.lng, actual.latitude, actual.longitude);
+      const score = Math.max(0, Math.round(5000 - dist * 100));
+
+      trueLatLng = { lat: actual.latitude, lng: actual.longitude };
+
+      infoText.setAttribute('value', `📸 Image: ${actual.filename}
+📍 Distance: ${dist.toFixed(2)} km
+🎯 Score: ${score} / 5000`);
+      infoPanel.setAttribute('visible', true);
+      console.log('Submit guess:', markerLatLng, 'Actual:', trueLatLng, 'Distance:', dist);
+    });
+
+    // Listen for clicks in VR scene to pick marker location
+    // We do this by raycasting intersection on a ground plane or sphere. For simplicity, let's add a listener on scene click:
+
+    const scene = document.querySelector('a-scene');
+    scene.addEventListener('click', (evt) => {
+      // The event.detail.intersection.point gives the clicked 3D position
+      if (evt.detail && evt.detail.intersection) {
+        const point = evt.detail.intersection.point;
+        // Convert 3D point to lat/lng (this requires your own mapping; here simplified)
+        // For demo, let's pretend x = lng, z = lat, scaled arbitrarily:
+        markerLatLng = { lat: point.z, lng: point.x };
+        infoPanel.setAttribute('visible', false);
+        console.log('Marker set at:', markerLatLng);
+      }
+    });
+
+    // Initialize
+    window.addEventListener('load', () => {
+      initLocations();
+    });
   </script>
 </body>
 </html>
