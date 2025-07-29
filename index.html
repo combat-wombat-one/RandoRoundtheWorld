@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <title>VR GeoGuessr - Fixed Version</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <!-- *** FIX: Added the robust Troika library for reliable text rendering *** -->
+  <script src="https://unpkg.com/aframe-troika-text/dist/aframe-troika-text.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -12,7 +14,6 @@
     body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; background: #000; }
     #startButton { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 18px; background: #2196F3; color: #fff; border: none; border-radius: 5px; cursor: pointer; z-index: 999; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
     #mapContainer { position: fixed; top: -10000px; left: -10000px; width: 1024px; height: 640px; background: white; }
-    /* The 2D timer is no longer needed, we use the one in VR */
   </style>
 </head>
 <body>
@@ -21,7 +22,9 @@
 <div id="mapContainer"></div>
 
 <a-scene id="scene" 
-         vr-mode-ui="enabled: true; refSpaceType: local-floor"
+         <!-- *** FIX: Corrected the vr-mode-ui syntax and added webxr property *** -->
+         webxr="referenceSpaceType: local-floor"
+         vr-mode-ui="enabled: true"
          renderer="antialias: true; logarithmicDepthBuffer: true"
          visible="false">
          
@@ -33,42 +36,51 @@
   
   <a-entity id="cameraRig" position="0 1.6 0">
     <a-camera id="camera" wasd-controls-enabled="false">
-      <a-cursor raycaster="objects: .clickable"></a-cursor>
-      <a-text id="vrLoadingText" value="Loading Game..." align="center" position="0 0 -1.5" color="white" width="3" visible="false"></a-text>
+      <a-entity id="vrLoadingText" visible="false"
+                troika-text="value: Loading Game...; align: center; color: white; fontSize: 0.1"
+                position="0 0 -1.5">
+      </a-entity>
     </a-camera>
-    <a-entity id="rightController" 
-              oculus-touch-controls="hand: right"
-              laser-controls="hand: right"
-              raycaster="objects: .clickable; far: 20;">
-    </a-entity>
+    <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .clickable; far: 20;"></a-entity>
   </a-entity>
   
+  <!-- *** FIX: Buttons now use troika-text for guaranteed visibility *** -->
   <a-entity id="gameUI" position="0 1.5 -2.5" visible="false">
-    <a-plane id="guessBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#9C27B0">
-      <a-text value="MAKE GUESS" align="center" color="white" position="0 0 0.01" width="1.1"></a-text>
-    </a-plane>
-    <a-plane id="confirmBtn" class="clickable" position="0 -0.25 0" width="1.2" height="0.4" color="#FF9800" visible="false">
-      <a-text value="CONFIRM GUESS" align="center" color="white" position="0 0 0.01" width="1.1"></a-text>
-    </a-plane>
-    <a-plane id="nextRoundBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
-      <a-text value="NEXT ROUND" align="center" color="white" position="0 0 0.01" width="1.1"></a-text>
-    </a-plane>
+    <a-entity id="guessBtn" class="clickable" position="0 0.25 0"
+              geometry="primitive: plane; width: 1.2; height: 0.4"
+              material="color: #9C27B0"
+              troika-text="value: MAKE GUESS; align: center; color: white; fontSize: 0.1">
+    </a-entity>
+    <a-entity id="confirmBtn" class="clickable" position="0 -0.25 0" visible="false"
+              geometry="primitive: plane; width: 1.2; height: 0.4"
+              material="color: #FF9800"
+              troika-text="value: CONFIRM GUESS; align: center; color: white; fontSize: 0.1">
+    </a-entity>
+    <a-entity id="nextRoundBtn" class="clickable" position="0 0.25 0" visible="false"
+              geometry="primitive: plane; width: 1.2; height: 0.4"
+              material="color: #4CAF50"
+              troika-text="value: NEXT ROUND; align: center; color: white; fontSize: 0.1">
+    </a-entity>
   </a-entity>
   
   <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
     <a-plane id="mapPanel" class="clickable" width="2" height="1.25" material="shader: flat; side: double">
-      <a-text id="locationText" value="Click MAKE GUESS to start" align="center" position="0 -0.7 0.01" color="black" width="1.8"></a-text>
+      <a-entity id="locationText" position="0 -0.7 0.01"
+                troika-text="value: Click MAKE GUESS to start; align: center; color: black; fontSize: 0.06; outlineWidth: 0.005; outlineColor: #FFF">
+      </a-entity>
     </a-plane>
   </a-entity>
   
   <a-entity id="scoreAndTimer" position="0 2.8 -2.5" visible="false">
-    <a-text id="scoreText" value="SCORE: 0" align="center" color="white" width="3"></a-text>
-    <a-text id="timerText" value="02:00" align="right" position="1.5 0 0" color="white" width="2"></a-text>
+    <a-entity id="scoreText" position="0 0 0" troika-text="value: SCORE: 0; align: center; color: white; fontSize: 0.1"></a-entity>
+    <a-entity id="timerText" position="0.9 0 0" troika-text="value: 02:00; align: right; color: white; fontSize: 0.1"></a-entity>
   </a-entity>
   
   <a-entity id="resultsPanel" position="0 1.5 -2" visible="false">
     <a-plane width="2.2" height="1.2" color="#333333" opacity="0.9">
-      <a-text id="resultsText" value="" align="center" color="white" position="0 0 0.01" width="2"></a-text>
+      <a-entity id="resultsText" position="0 0 0.01"
+                troika-text="value:; align: center; color: white; fontSize: 0.07; wrapMode: word; maxWidth: 2">
+      </a-entity>
     </a-plane>
   </a-entity>
 </a-scene>
@@ -104,19 +116,16 @@ class VRGeoGuessr {
     this.timeLeft = 120;
     this.isInGuessMode = false;
     this.currentGuess = null;
-    this.acceptingInput = false; // *** FIX: Start with input disabled ***
+    this.acceptingInput = false;
 
     this.bindEvents();
   }
 
   bindEvents() {
     this.startButton.addEventListener('click', () => this.initExperience());
-    
-    // *** FIX: Add guard clause to all click handlers ***
     this.guessBtn.addEventListener('click', () => { if (this.acceptingInput) this.startGuessing(); });
     this.confirmBtn.addEventListener('click', () => { if (this.acceptingInput) this.submitGuess(); });
     this.nextRoundBtn.addEventListener('click', () => { if (this.acceptingInput) this.startNewRound(); });
-    
     this.mapPanel.addEventListener('click', (event) => {
         if (!this.acceptingInput || !this.isInGuessMode || !event.detail.intersection) return;
         this.handleControllerMapClick(event.detail.intersection.uv);
@@ -127,7 +136,6 @@ class VRGeoGuessr {
     this.startButton.style.display = 'none';
     this.scene.setAttribute('visible', 'true');
     this.vrLoadingText.setAttribute('visible', 'true');
-
     this.scene.enterVR().then(() => this.loadAndStartGame())
       .catch(err => {
         console.error("Could not enter VR mode:", err);
@@ -140,15 +148,12 @@ class VRGeoGuessr {
         await this.loadCSV();
         await this.preloadImages();
         this.initMap();
-        
         this.vrLoadingText.setAttribute('visible', 'false');
         this.gameUI.setAttribute('visible', 'true');
         this.scoreAndTimer.setAttribute('visible', 'true');
-
         this.startNewRound();
     } catch(error) {
-        console.error("Failed to load game assets:", error);
-        this.vrLoadingText.setAttribute('value', `Error: ${error.message}`);
+        this.vrLoadingText.setAttribute('troika-text', 'value', `Error: ${error.message}`);
     }
   }
 
@@ -156,7 +161,7 @@ class VRGeoGuessr {
     const minutes = Math.floor(this.timeLeft / 60);
     const seconds = this.timeLeft % 60;
     const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    this.timerText.setAttribute('value', timeStr);
+    this.timerText.setAttribute('troika-text', 'value', timeStr);
   }
 
   startTimer() {
@@ -178,15 +183,14 @@ class VRGeoGuessr {
 
   async loadCSV() {
     return new Promise((resolve, reject) => {
-      this.vrLoadingText.setAttribute('value', 'Loading location data...');
+      this.vrLoadingText.setAttribute('troika-text', 'value', 'Loading location data...');
       Papa.parse('locations.csv', {
         download: true, header: true,
         complete: (r) => {
           this.data = r.data.filter(row => row.filename && row.latitude && row.longitude);
           if (this.data.length === 0) return reject(new Error('No valid locations in CSV'));
           resolve();
-        },
-        error: (err) => reject(new Error(`CSV Error: ${err.message}`))
+        }, error: (err) => reject(new Error(`CSV Error: ${err.message}`))
       });
     });
   }
@@ -195,8 +199,7 @@ class VRGeoGuessr {
     return new Promise((resolve) => {
       let loadedCount = 0;
       const totalImages = this.data.length;
-      this.vrLoadingText.setAttribute('value', `Loading images (0/${totalImages})...`);
-      
+      this.vrLoadingText.setAttribute('troika-text', 'value', `Loading images (0/${totalImages})...`);
       this.data.forEach((row, i) => {
         const img = document.createElement('img');
         img.id = `img-${i}`;
@@ -204,7 +207,7 @@ class VRGeoGuessr {
         img.src = `Images/${row.filename.trim()}`;
         const onFinish = () => {
             loadedCount++;
-            this.vrLoadingText.setAttribute('value', `Loading images (${loadedCount}/${totalImages})...`);
+            this.vrLoadingText.setAttribute('troika-text', 'value', `Loading images (${loadedCount}/${totalImages})...`);
             if (loadedCount === totalImages) resolve();
         }
         img.onload = onFinish;
@@ -218,6 +221,12 @@ class VRGeoGuessr {
     if (this.leafletMap) this.leafletMap.remove();
     this.leafletMap = L.map(this.mapContainer, { center: [0, 0], zoom: 1, zoomControl: false, attributionControl: false, preferCanvas: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, crossOrigin: true }).addTo(this.leafletMap);
+    
+    // *** FIX: Add event listener to update texture when map view changes ***
+    this.leafletMap.on('moveend zoomend viewreset', () => {
+        this.updateMapTexture();
+    });
+
     setTimeout(() => this.leafletMap.invalidateSize(), 500);
   }
 
@@ -235,8 +244,7 @@ class VRGeoGuessr {
 
   startNewRound() {
     this.round++;
-    this.acceptingInput = false; // *** FIX: Disable input at start of round ***
-    
+    this.acceptingInput = false;
     this.isInGuessMode = false;
     this.currentGuess = null;
     this.resultsPanel.setAttribute('visible', 'false');
@@ -244,16 +252,12 @@ class VRGeoGuessr {
     this.confirmBtn.setAttribute('visible', 'false');
     this.nextRoundBtn.setAttribute('visible', 'false');
     this.guessBtn.setAttribute('visible', 'true');
-    
     const randomIdx = Math.floor(Math.random() * this.data.length);
     this.currentIdx = randomIdx;
     const location = this.data[this.currentIdx];
     this.sky.setAttribute('src', location.failedToLoad ? '#fallback' : `#img-${this.currentIdx}`);
-    
     this.resetTimer();
     this.startTimer();
-
-    // *** FIX: Re-enable input after a 1-second grace period ***
     setTimeout(() => { this.acceptingInput = true; }, 1000);
   }
 
@@ -262,11 +266,8 @@ class VRGeoGuessr {
     this.mapWrapper.setAttribute('visible', 'true');
     this.guessBtn.setAttribute('visible', 'false');
     this.confirmBtn.setAttribute('visible', 'true');
-    this.locationText.setAttribute('value', 'Point and click on the map\nto place your guess');
-    
+    this.locationText.setAttribute('troika-text', 'value', 'Point and click on the map\nto place your guess');
     this.leafletMap.setView([20, 0], 2);
-    this.leafletMap.eachLayer(layer => { if (layer instanceof L.Marker) this.leafletMap.removeLayer(layer); });
-    this.updateMapTexture();
   }
   
   handleControllerMapClick(uv) {
@@ -274,16 +275,15 @@ class VRGeoGuessr {
     const lng = bounds.getWest() + (bounds.getEast() - bounds.getWest()) * uv.x;
     const lat = bounds.getSouth() + (bounds.getNorth() - bounds.getSouth()) * (1 - uv.y);
     const latlng = L.latLng(lat, lng);
-
     this.leafletMap.eachLayer(layer => { if (layer instanceof L.Marker) this.leafletMap.removeLayer(layer); });
     L.marker(latlng).addTo(this.leafletMap);
     this.currentGuess = latlng;
-    this.locationText.setAttribute('value', 'Pin placed! Click CONFIRM GUESS');
-    this.updateMapTexture();
+    this.locationText.setAttribute('troika-text', 'value', 'Pin placed! Click CONFIRM GUESS');
+    this.leafletMap.panTo(latlng); // This will trigger the 'moveend' event and update the texture
   }
 
   submitGuess() {
-    if (!this.currentGuess) { this.locationText.setAttribute('value', 'Please place a pin on the map first'); return; }
+    if (!this.currentGuess) { this.locationText.setAttribute('troika-text', 'value', 'Please place a pin on the map first'); return; }
     this.endRound(true, this.currentGuess);
   }
 
@@ -292,9 +292,8 @@ class VRGeoGuessr {
   }
 
   endRound(guessed, guessLatLng) {
-    this.acceptingInput = false; // Disable input when showing results
+    this.acceptingInput = false;
     clearInterval(this.timer);
-    
     const location = this.data[this.currentIdx];
     const actualLoc = L.latLng(parseFloat(location.latitude), parseFloat(location.longitude));
     let roundScore = 0, distance = 0;
@@ -303,16 +302,16 @@ class VRGeoGuessr {
       distance = this.leafletMap.distance(guessLatLng, actualLoc);
       roundScore = this.calculateScore(distance);
       this.score += roundScore;
-      this.scoreText.setAttribute('value', `SCORE: ${this.score}`);
+      this.scoreText.setAttribute('troika-text', 'value', `SCORE: ${this.score}`);
       L.marker(guessLatLng).addTo(this.leafletMap);
     }
     
     L.marker(actualLoc, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(this.leafletMap);
     if (guessed) this.leafletMap.fitBounds(L.polyline([guessLatLng, actualLoc]).getBounds().pad(0.2));
     else this.leafletMap.setView(actualLoc, 5);
-    this.updateMapTexture();
     
-    this.resultsText.setAttribute('value', `ROUND ${this.round}/${this.totalRounds}\n` + (guessed ? `DISTANCE: ${(distance/1000).toFixed(1)} km\nPOINTS: ${roundScore}` : 'TIME EXPIRED!') + `\n\nTOTAL SCORE: ${this.score}`);
+    const resultsValue = `ROUND ${this.round}/${this.totalRounds}\n` + (guessed ? `DISTANCE: ${(distance/1000).toFixed(1)} km\nPOINTS: ${roundScore}` : 'TIME EXPIRED!') + `\n\nTOTAL SCORE: ${this.score}`;
+    this.resultsText.setAttribute('troika-text', 'value', resultsValue);
     
     this.resultsPanel.setAttribute('visible', 'true');
     this.guessBtn.setAttribute('visible', 'false');
@@ -321,10 +320,10 @@ class VRGeoGuessr {
     
     if (this.round < this.totalRounds) {
       this.nextRoundBtn.setAttribute('visible', 'true');
-      setTimeout(() => { this.acceptingInput = true; }, 500); // Re-enable for next round button
+      setTimeout(() => { this.acceptingInput = true; }, 500);
     } else {
       this.nextRoundBtn.setAttribute('visible', 'false');
-      setTimeout(() => { this.resultsText.setAttribute('value', `GAME OVER!\nFINAL SCORE: ${this.score}`); }, 4000);
+      setTimeout(() => { this.resultsText.setAttribute('troika-text', 'value', `GAME OVER!\nFINAL SCORE: ${this.score}`); }, 4000);
     }
   }
 }
