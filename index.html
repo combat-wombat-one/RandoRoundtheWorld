@@ -2,12 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>VR GeoGuessr with Controllers</title>
+  <title>VR GeoGuessr with Reliable VR Entry</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Removed problematic dependencies to ensure reliability -->
   <style>
     body {
       margin: 0;
@@ -29,7 +26,6 @@
       border-radius: 5px; 
       cursor: pointer;
       z-index: 999;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     
     #loading {
@@ -44,505 +40,125 @@
       display: none;
       z-index: 1000;
     }
-    
-    #error {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,0,0,0.7);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 5px;
-      display: none;
-      z-index: 1000;
-      max-width: 80%;
-      text-align: center;
-    }
-    
-    #mapContainer {
-      position: fixed;
-      top: -10000px;
-      left: -10000px;
-      width: 1024px;
-      height: 640px;
-      background: white;
-    }
-    
-    #timer {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 5px;
-      font-size: 24px;
-      z-index: 1000;
-      display: none;
-    }
   </style>
 </head>
 <body>
 
-<button id="startButton">Start Game</button>
-<div id="loading">Loading assets, please wait...</div>
-<div id="error"></div>
-<div id="timer">02:00</div>
-
-<!-- Offscreen Leaflet map -->
-<div id="mapContainer"></div>
+<button id="startButton">Start VR Experience</button>
+<div id="loading">Loading, please wait...</div>
 
 <a-scene id="scene" 
-         embedded 
          vr-mode-ui="enabled: true"
-         visible="false" 
+         renderer="antialias: true; logarithmicDepthBuffer: true"
          loading-screen="dotsColor: #0080e5; backgroundColor: #000000"
-         renderer="antialias: true; logarithmicDepthBuffer: true">
+         visible="false">
          
-  <a-assets>
-    <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
-  </a-assets>
+  <!-- Simple scene to verify VR works -->
+  <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
+  <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
+  <a-cylinder position="1 0.75 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
+  <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
   
-  <a-sky id="sky" color="#000000"></a-sky>
-  
-  <!-- Camera rig with controllers -->
-  <a-entity id="rig" movement-controls="speed: 0.5">
-    <a-entity id="camera" camera position="0 1.6 0" wasd-controls="enabled: false">
-      <a-cursor fuse="true" fuse-timeout="800"
-                raycaster="objects: .clickable"
-                material="color: cyan"
-                geometry="radiusInner: 0.005; radiusOuter: 0.015">
-      </a-cursor>
-    </a-entity>
-    
-    <!-- Left controller -->
-    <a-entity id="leftHand" 
-              hand-controls="hand: left"
-              oculus-touch-controls="hand: left"
-              vive-controls="hand: left">
-    </a-entity>
-    
-    <!-- Right controller -->
-    <a-entity id="rightHand" 
-              hand-controls="hand: right"
-              oculus-touch-controls="hand: right"
-              vive-controls="hand: right"
-              raycaster="objects: .clickable, [data-clickable]"
-              laser-controls="hand: right">
-    </a-entity>
-  </a-entity>
-  
-  <!-- Game UI -->
-  <a-plane id="guessBtn" class="clickable" position="0 1 -2" width="1.2" height="0.4" color="#9C27B0">
-    <a-text value="Make Guess" align="center" color="white" position="0 0 0.01"></a-text>
-  </a-plane>
-  
-  <a-plane id="nextRoundBtn" class="clickable" position="0 0.5 -2" width="1.2" height="0.4" color="#4CAF50" visible="false">
-    <a-text value="Next Round" align="center" color="white" position="0 0 0.01"></a-text>
-  </a-plane>
-  
-  <!-- Map Panel -->
-  <a-plane id="mapPanel" class="clickable" position="-2 1.5 -1.5" width="1.6" height="1" material="shader: flat; side: double">
-    <a-text id="locationText" value="Loading..." align="center" position="0 -0.6 0.01" color="black" width="2"></a-text>
-  </a-plane>
-  
-  <!-- Score Display -->
-  <a-entity position="0 2 -2">
-    <a-text id="scoreText" value="Score: 0" align="center" color="white" width="3"></a-text>
-  </a-entity>
-  
-  <!-- Results Display -->
-  <a-entity id="resultsPanel" position="0 1.3 -1.5" visible="false">
-    <a-plane width="2" height="1" color="#333">
-      <a-text id="resultsText" value="" align="center" color="white" position="0 0 0.01" width="1.8"></a-text>
-    </a-plane>
-  </a-entity>
-  
-  <!-- Fallback for non-VR -->
-  <a-entity id="nonVrMessage" position="0 1.6 -3" visible="false">
-    <a-text value="VR not available\nUse mouse to look around" 
-           align="center" color="white" width="3"></a-text>
+  <a-entity position="0 1.6 0">
+    <a-camera>
+      <a-cursor></a-cursor>
+    </a-camera>
   </a-entity>
 </a-scene>
 
 <script>
-// DOM elements
-const startButton = document.getElementById('startButton');
-const loadingIndicator = document.getElementById('loading');
-const errorDisplay = document.getElementById('error');
-const scene = document.getElementById('scene');
-const sky = document.getElementById('sky');
-const guessBtn = document.getElementById('guessBtn');
-const nextRoundBtn = document.getElementById('nextRoundBtn');
-const mapPanel = document.getElementById('mapPanel');
-const locationText = document.getElementById('locationText');
-const scoreText = document.getElementById('scoreText');
-const resultsPanel = document.getElementById('resultsPanel');
-const resultsText = document.getElementById('resultsText');
-const nonVrMessage = document.getElementById('nonVrMessage');
-const mapContainer = document.getElementById('mapContainer');
-const timerDisplay = document.getElementById('timer');
-const rightHand = document.getElementById('rightHand');
-
-// Game state
-let data = [];
-let currentIdx = 0;
-let leafletMap;
-let score = 0;
-let round = 1;
-const totalRounds = 5;
-let timer;
-let timeLeft = 120;
-let isInGuessMode = false;
-
-// Show loading state
-function showLoading(message) {
-  loadingIndicator.textContent = message;
-  loadingIndicator.style.display = 'block';
-}
-
-// Hide loading
-function hideLoading() {
-  loadingIndicator.style.display = 'none';
-}
-
-// Show error
-function showError(message) {
-  errorDisplay.textContent = message;
-  errorDisplay.style.display = 'block';
-  setTimeout(() => {
-    errorDisplay.style.display = 'none';
-  }, 5000);
-}
-
-// Update timer display
-function updateTimer() {
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
-
-// Start timer
-function startTimer() {
-  timerDisplay.style.display = 'block';
-  updateTimer();
-  timer = setInterval(() => {
-    timeLeft--;
-    updateTimer();
-    
-    if (timeLeft <= 0) {
-      clearInterval(timer);
-      endRound(false);
-    }
-  }, 1000);
-}
-
-// Reset timer for new round
-function resetTimer() {
-  clearInterval(timer);
-  timeLeft = 120;
-  updateTimer();
-}
-
-// Load CSV data
-function loadCSV() {
-  showLoading('Loading location data...');
+// Simple VR activation test
+document.getElementById('startButton').addEventListener('click', function() {
+  const scene = document.getElementById('scene');
+  const loading = document.getElementById('loading');
   
-  return new Promise((resolve, reject) => {
-    Papa.parse('locations.csv', {
-      download: true,
-      header: true,
-      complete(r) {
-        hideLoading();
-        data = r.data.filter(row => row.filename && row.latitude && row.longitude);
-        
-        if (data.length === 0) {
-          const error = 'No valid data found in CSV. Ensure it has filename, latitude, and longitude columns.';
-          showError(error);
-          reject(error);
-          return;
-        }
-        
-        resolve(data);
-      },
-      error(err) {
-        const error = `Failed to load CSV: ${err.message}`;
-        showError(error);
-        reject(error);
+  // Show loading indicator
+  loading.style.display = 'block';
+  loading.textContent = "Initializing VR...";
+  
+  // Show the scene
+  scene.setAttribute('visible', 'true');
+  
+  // Hide start button
+  this.style.display = 'none';
+  
+  // First check if VR is actually available
+  if (navigator.xr) {
+    navigator.xr.isSessionSupported('immersive-vr').then(function(supported) {
+      if (supported) {
+        // VR is supported - enter VR mode after a brief delay
+        loading.textContent = "Starting VR...";
+        setTimeout(function() {
+          scene.enterVR().then(function() {
+            loading.style.display = 'none';
+          }).catch(function(err) {
+            loading.textContent = "VR failed: " + (err.message || "Unknown error");
+            console.error("VR entry failed:", err);
+          });
+        }, 500);
+      } else {
+        // VR not supported
+        loading.textContent = "VR not available on this device";
+        console.warn("VR not supported");
+      }
+    }).catch(function(err) {
+      loading.textContent = "VR check failed";
+      console.error("VR support check failed:", err);
+    });
+  } else {
+    // No WebXR API at all
+    loading.textContent = "WebXR not supported in this browser";
+    console.warn("No WebXR support");
+  }
+});
+
+// Alternative reliable VR entry method
+function enterVRWithFallback() {
+  const scene = document.getElementById('scene');
+  
+  // First try the standard way
+  scene.enterVR().catch(function(err) {
+    console.log("Standard VR entry failed, trying alternative method");
+    
+    // Alternative method for some headsets
+    if (navigator.xr) {
+      navigator.xr.requestSession('immersive-vr').then(function(session) {
+        session.addEventListener('end', function() {
+          console.log("VR session ended");
+        });
+        scene.xrSession = session;
+      }).catch(function(err) {
+        console.error("Alternative VR entry failed:", err);
+      });
+    }
+  });
+}
+
+// Add click handler to the scene's VR button when it appears
+document.addEventListener('DOMContentLoaded', function() {
+  const scene = document.getElementById('scene');
+  
+  // Watch for the VR button being added to the DOM
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.addedNodes) {
+        mutation.addedNodes.forEach(function(node) {
+          if (node.classList && node.classList.contains('a-enter-vr-button')) {
+            // Found the VR button - enhance its behavior
+            node.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              enterVRWithFallback();
+            });
+          }
+        });
       }
     });
   });
-}
-
-// Preload images
-function preloadImages() {
-  showLoading('Preloading images...');
   
-  let loadedCount = 0;
-  const totalImages = data.length;
-  
-  return new Promise((resolve) => {
-    data.forEach((row, i) => {
-      const img = new Image();
-      img.id = `img-${i}`;
-      img.crossOrigin = 'anonymous';
-      img.src = `Images/${row.filename.trim()}`;
-      
-      img.onload = () => {
-        loadedCount++;
-        if (loadedCount === totalImages) {
-          hideLoading();
-          resolve();
-        }
-      };
-      
-      img.onerror = () => {
-        console.error(`Failed to load image: ${row.filename}`);
-        row.failedToLoad = true;
-        loadedCount++;
-        
-        if (loadedCount === totalImages) {
-          hideLoading();
-          resolve();
-        }
-      };
-    });
-  });
-}
-
-// Initialize Leaflet map with retry logic
-function initMap() {
-  if (leafletMap) {
-    leafletMap.remove();
-  }
-
-  leafletMap = L.map(mapContainer, {
-    center: [0, 0],
-    zoom: 1,
-    zoomControl: false,
-    attributionControl: false,
-    preferCanvas: true
-  });
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    crossOrigin: true
-  }).addTo(leafletMap);
-
-  // Force initial render
-  setTimeout(() => {
-    leafletMap.invalidateSize();
-    updateMapTexture();
-  }, 500);
-}
-
-// Update map texture
-function updateMapTexture() {
-  html2canvas(mapContainer, {
-    backgroundColor: null,
-    scale: 1,
-    useCORS: true,
-    allowTaint: true,
-    logging: false
-  }).then(canvas => {
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.anisotropy = 16;
-    texture.minFilter = THREE.LinearFilter;
-    
-    const mesh = mapPanel.getObject3D('mesh');
-    if (mesh) {
-      mesh.material.map = texture;
-      mesh.material.needsUpdate = true;
-    }
-  }).catch(err => {
-    console.error('Map render error:', err);
-    setTimeout(updateMapTexture, 500);
-  });
-}
-
-// Set random image for new round
-function setRandomImage() {
-  const randomIdx = Math.floor(Math.random() * data.length);
-  currentIdx = randomIdx;
-  const location = data[currentIdx];
-  
-  // Set sky image
-  const imgId = location.failedToLoad ? '#fallback' : `#img-${currentIdx}`;
-  sky.setAttribute('src', imgId);
-  sky.setAttribute('color', '#fff');
-  
-  // Reset map for guessing
-  leafletMap.setView([0, 0], 1);
-  leafletMap.eachLayer(layer => {
-    if (layer instanceof L.Marker) {
-      leafletMap.removeLayer(layer);
-    }
-  });
-  updateMapTexture();
-  
-  // Update UI
-  guessBtn.setAttribute('visible', 'true');
-  nextRoundBtn.setAttribute('visible', 'false');
-  resultsPanel.setAttribute('visible', 'false');
-  isInGuessMode = true;
-  
-  // Start timer
-  resetTimer();
-  startTimer();
-}
-
-// Calculate score based on distance
-function calculateScore(distance) {
-  const maxPoints = 5000;
-  const maxDistance = 20000;
-  const points = Math.max(0, maxPoints * (1 - distance / maxDistance));
-  return Math.round(points);
-}
-
-// End the current round
-function endRound(guessed) {
-  clearInterval(timer);
-  isInGuessMode = false;
-  
-  const location = data[currentIdx];
-  const actualLoc = [parseFloat(location.latitude), parseFloat(location.longitude)];
-  
-  // Show correct location
-  leafletMap.setView(actualLoc, 12);
-  L.marker(actualLoc).addTo(leafletMap);
-  updateMapTexture();
-  
-  // Update score if guessed
-  let roundScore = 0;
-  if (guessed) {
-    const guessLoc = leafletMap.getCenter();
-    const distance = leafletMap.distance(guessLoc, actualLoc);
-    roundScore = calculateScore(distance);
-    score += roundScore;
-  }
-  
-  // Show results
-  resultsText.setAttribute('value', 
-    `Round ${round}/${totalRounds}\n` +
-    (guessed ? `Distance: ${(distance/1000).toFixed(1)} km\nPoints: ${roundScore}` : 'Time expired!') +
-    `\nTotal Score: ${score}`);
-  
-  resultsPanel.setAttribute('visible', 'true');
-  guessBtn.setAttribute('visible', 'false');
-  
-  // Show next round button or end game
-  if (round < totalRounds) {
-    nextRoundBtn.setAttribute('visible', 'true');
-  } else {
-    setTimeout(() => {
-      resultsText.setAttribute('value', 
-        `Game Over!\nFinal Score: ${score}\n` +
-        `Average: ${Math.round(score/totalRounds)} per round`);
-    }, 2000);
-  }
-}
-
-// Start a new round
-function startNewRound() {
-  round++;
-  setRandomImage();
-}
-
-// Handle controller events
-function setupControllerEvents() {
-  // Right controller trigger for interactions
-  rightHand.addEventListener('triggerdown', () => {
-    if (!isInGuessMode) return;
-    
-    // Get controller raycast intersection
-    const intersection = rightHand.components.raycaster.getIntersection(mapPanel);
-    if (intersection) {
-      // Convert intersection point to map coordinates
-      const point = intersection.point;
-      const mapSize = mapPanel.getAttribute('width');
-      const halfSize = mapSize / 2;
-      
-      // Normalize to -1 to 1 range
-      const x = (point.x / halfSize);
-      const y = -(point.y / halfSize);
-      
-      // Convert to lat/long
-      const bounds = leafletMap.getBounds();
-      const lat = bounds.getSouth() + (1 - y) * (bounds.getNorth() - bounds.getSouth());
-      const lng = bounds.getWest() + (x + 1) * (bounds.getEast() - bounds.getWest()) / 2;
-      
-      // Simulate map click
-      leafletMap.fire('click', {
-        latlng: L.latLng(lat, lng),
-        layerPoint: leafletMap.latLngToLayerPoint(L.latLng(lat, lng))
-      });
-    }
-  });
-
-  // UI button interactions
-  document.querySelectorAll('.clickable').forEach(el => {
-    el.addEventListener('click', () => {
-      if (isInGuessMode) return;
-      el.emit('click');
-    });
-  });
-}
-
-// Initialize the experience
-async function initExperience() {
-  try {
-    await loadCSV();
-    await preloadImages();
-    initMap();
-    
-    scene.setAttribute('visible', 'true');
-    startButton.style.display = 'none';
-    
-    // Setup controller events
-    setupControllerEvents();
-    
-    // Set up game event listeners
-    guessBtn.addEventListener('click', () => {
-      leafletMap.once('click', (e) => {
-        endRound(true);
-      });
-      resultsText.setAttribute('value', 'Click on the map to guess!');
-    });
-    
-    nextRoundBtn.addEventListener('click', startNewRound);
-    
-    // Start first round
-    setRandomImage();
-    
-  } catch (error) {
-    console.error('Initialization error:', error);
-    showError(`Failed to initialize: ${error.message}`);
-    startButton.style.display = 'block';
-  }
-}
-
-// Start button handler
-startButton.addEventListener('click', initExperience);
-
-// Sample data fallback for local testing
-if (window.location.href.includes('localhost') || window.location.href.includes('127.0.0.1')) {
-  window.fallbackData = [
-    {filename: 'pano1.jpg', latitude: '40.7128', longitude: '-74.0060', name: 'New York'},
-    {filename: 'pano2.jpg', latitude: '51.5074', longitude: '-0.1278', name: 'London'},
-    {filename: 'pano3.jpg', latitude: '48.8566', longitude: '2.3522', name: 'Paris'},
-    {filename: 'pano4.jpg', latitude: '35.6762', longitude: '139.6503', name: 'Tokyo'},
-    {filename: 'pano5.jpg', latitude: '-33.8688', longitude: '151.2093', name: 'Sydney'}
-  ];
-  
-  setTimeout(() => {
-    if (data.length === 0 && window.fallbackData) {
-      data = window.fallbackData;
-      preloadImages();
-      initMap();
-    }
-  }, 3000);
-}
+  // Start observing the scene for VR button additions
+  observer.observe(scene, { childList: true, subtree: true });
+});
 </script>
 </body>
 </html>
