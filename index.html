@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Ayush's Enhanced VR with Interactive Map</title>
+  <title>Enhanced VR with Interactive Map</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -13,6 +13,7 @@
       margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
+      background: #000;
     }
     
     #startButton {
@@ -29,6 +30,22 @@
       cursor: pointer;
       z-index: 999;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    #vrButton {
+      position: absolute;
+      top: 60%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 15px 30px;
+      background: #FF9800;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 18px;
+      z-index: 1000;
+      cursor: pointer;
+      display: none;
     }
     
     #loading {
@@ -85,13 +102,14 @@
 <body>
 
 <button id="startButton">Start Experience</button>
+<button id="vrButton">Enter VR</button>
 <div id="loading">Loading assets, please wait...</div>
 <div id="error"></div>
 
 <!-- Offscreen Leaflet map -->
 <div id="mapContainer"></div>
 
-<a-scene id="scene" embedded vr-mode-ui="enabled:true" visible="false" loading-screen="dotsColor: #0080e5; backgroundColor: #000000">
+<a-scene id="scene" embedded vr-mode-ui="enabled:true" visible="false" loading-screen="dotsColor: #0080e5; backgroundColor: #000000" webxr="optionalFeatures: local-floor; requiredFeatures: local-floor;">
   <a-assets id="assets">
     <!-- Fallback image in case loading fails -->
     <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
@@ -142,6 +160,7 @@
 <script>
 // DOM elements
 const startButton = document.getElementById('startButton');
+const vrButton = document.getElementById('vrButton');
 const loadingIndicator = document.getElementById('loading');
 const errorDisplay = document.getElementById('error');
 const scene = document.getElementById('scene');
@@ -168,13 +187,21 @@ function checkVRSupport() {
     if (navigator.xr) {
       navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
         isVRAvailable = supported;
+        if (!supported) {
+          nonVrMessage.setAttribute('visible', 'true');
+          nonVrFallback.style.display = 'block';
+        }
         resolve(supported);
       }).catch(() => {
         isVRAvailable = false;
+        nonVrMessage.setAttribute('visible', 'true');
+        nonVrFallback.style.display = 'block';
         resolve(false);
       });
     } else {
       isVRAvailable = false;
+      nonVrMessage.setAttribute('visible', 'true');
+      nonVrFallback.style.display = 'block';
       resolve(false);
     }
   });
@@ -398,12 +425,6 @@ async function initExperience() {
     // Check VR support
     await checkVRSupport();
     
-    if (!isVRAvailable) {
-      nonVrMessage.setAttribute('visible', 'true');
-      nonVrFallback.style.display = 'block';
-      console.log('VR not available, falling back to desktop mode');
-    }
-    
     // Load data
     await loadCSV();
     
@@ -417,9 +438,22 @@ async function initExperience() {
     scene.setAttribute('visible', 'true');
     startButton.style.display = 'none';
     
+    // Show VR button if supported
+    if (isVRAvailable) {
+      vrButton.style.display = 'block';
+    }
+    
     // Set up event listeners
     nextBtn.addEventListener('click', nextImage);
     prevBtn.addEventListener('click', prevImage);
+    
+    // VR button handler
+    vrButton.addEventListener('click', () => {
+      scene.enterVR().catch(err => {
+        console.error('Failed to enter VR:', err);
+        showError('Failed to enter VR. Ensure your headset is connected and WebXR is supported.');
+      });
+    });
     
     // Keyboard navigation
     document.addEventListener('keydown', (e) => {
