@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Complete VR GeoGuessr</title>
+  <title>Enhanced VR GeoGuessr</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -107,9 +107,10 @@
     <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
   </a-assets>
   
+  <!-- 360° background for the location -->
   <a-sky id="sky" color="#000000"></a-sky>
   
-  <!-- Camera rig with controllers -->
+  <!-- Camera rig with improved controller setup -->
   <a-entity id="rig" movement-controls="speed: 0.5">
     <a-entity id="camera" camera position="0 1.6 0" wasd-controls="enabled: false">
       <a-cursor fuse="true" fuse-timeout="800"
@@ -125,28 +126,46 @@
               vive-controls="hand: left">
     </a-entity>
     
-    <!-- Right controller (for interactions) -->
+    <!-- Right controller with improved laser pointer -->
     <a-entity id="rightHand" hand-controls="hand: right"
               oculus-touch-controls="hand: right"
               vive-controls="hand: right"
               raycaster="objects: .clickable"
-              laser-controls="hand: right">
+              laser-controls="hand: right; color: red; direction: 0 -0.1 -1">
+      <!-- Custom laser pointer coming from front of controller -->
+      <a-entity laser-pointer="color: red" position="0 -0.05 -0.1" rotation="-15 0 0"></a-entity>
     </a-entity>
   </a-entity>
   
-  <!-- Game UI -->
-  <a-plane id="guessBtn" class="clickable" position="0 1 -2" width="1.2" height="0.4" color="#9C27B0">
-    <a-text value="Make Guess" align="center" color="white" position="0 0 0.01"></a-text>
-  </a-plane>
+  <!-- Game UI with proper text labels -->
+  <a-entity id="gameUI" position="0 0 -2">
+    <!-- Make Guess Button -->
+    <a-plane id="guessBtn" class="clickable" position="0 1 0" width="1.2" height="0.4" color="#9C27B0">
+      <a-text value="Make Guess" align="center" color="white" position="0 0 0.01" width="1.1"></a-text>
+    </a-plane>
+    
+    <!-- Confirm Guess Button (hidden initially) -->
+    <a-plane id="confirmBtn" class="clickable" position="0 0.5 0" width="1.2" height="0.4" color="#FF9800" visible="false">
+      <a-text value="Confirm Guess" align="center" color="white" position="0 0 0.01" width="1.1"></a-text>
+    </a-plane>
+    
+    <!-- Next Round Button -->
+    <a-plane id="nextRoundBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
+      <a-text value="Next Round" align="center" color="white" position="0 0 0.01" width="1.1"></a-text>
+    </a-plane>
+  </a-entity>
   
-  <a-plane id="nextRoundBtn" class="clickable" position="0 0.5 -2" width="1.2" height="0.4" color="#4CAF50" visible="false">
-    <a-text value="Next Round" align="center" color="white" position="0 0 0.01"></a-text>
-  </a-plane>
-  
-  <!-- Map Panel -->
-  <a-plane id="mapPanel" class="clickable" position="-2 1.5 -1.5" width="1.6" height="1" material="shader: flat; side: double">
-    <a-text id="locationText" value="Loading..." align="center" position="0 -0.6 0.01" color="black" width="2"></a-text>
-  </a-plane>
+  <!-- Map Panel with pin display -->
+  <a-entity id="mapWrapper" position="-2 1.5 -1.5">
+    <a-plane id="mapPanel" class="clickable" width="1.6" height="1" material="shader: flat; side: double">
+      <a-text id="locationText" value="Loading..." align="center" position="0 -0.6 0.01" color="black" width="1.5"></a-text>
+    </a-plane>
+    <!-- Pin marker (hidden initially) -->
+    <a-entity id="mapPin" visible="false" position="0 0 0.02" scale="0.05 0.05 0.05">
+      <a-cone color="#FF0000" radius-bottom="0.1" height="0.3" position="0 0.15 0"></a-cone>
+      <a-sphere color="#FF0000" radius="0.05" position="0 0.3 0"></a-sphere>
+    </a-entity>
+  </a-entity>
   
   <!-- Score Display -->
   <a-entity position="0 2 -2">
@@ -178,8 +197,10 @@ class VRGeoGuessr {
     this.scene = document.getElementById('scene');
     this.sky = document.getElementById('sky');
     this.guessBtn = document.getElementById('guessBtn');
+    this.confirmBtn = document.getElementById('confirmBtn');
     this.nextRoundBtn = document.getElementById('nextRoundBtn');
     this.mapPanel = document.getElementById('mapPanel');
+    this.mapPin = document.getElementById('mapPin');
     this.locationText = document.getElementById('locationText');
     this.scoreText = document.getElementById('scoreText');
     this.resultsPanel = document.getElementById('resultsPanel');
@@ -200,6 +221,7 @@ class VRGeoGuessr {
     this.timeLeft = 120;
     this.isInGuessMode = false;
     this.isVRAvailable = false;
+    this.currentGuess = null;
 
     // Initialize
     this.bindEvents();
@@ -213,6 +235,7 @@ class VRGeoGuessr {
     
     // UI events
     this.guessBtn.addEventListener('click', () => this.startGuessing());
+    this.confirmBtn.addEventListener('click', () => this.submitGuess());
     this.nextRoundBtn.addEventListener('click', () => this.startNewRound());
   }
 
@@ -411,7 +434,7 @@ class VRGeoGuessr {
     this.currentIdx = randomIdx;
     const location = this.data[this.currentIdx];
     
-    // Set sky image
+    // Set 360° background image
     const imgId = location.failedToLoad ? '#fallback' : `#img-${this.currentIdx}`;
     this.sky.setAttribute('src', imgId);
     this.sky.setAttribute('color', '#fff');
@@ -427,9 +450,12 @@ class VRGeoGuessr {
     
     // Update UI
     this.guessBtn.setAttribute('visible', 'true');
+    this.confirmBtn.setAttribute('visible', 'false');
     this.nextRoundBtn.setAttribute('visible', 'false');
     this.resultsPanel.setAttribute('visible', 'false');
+    this.mapPin.setAttribute('visible', 'false');
     this.isInGuessMode = true;
+    this.currentGuess = null;
     
     // Start timer
     this.resetTimer();
@@ -439,10 +465,44 @@ class VRGeoGuessr {
   startGuessing() {
     if (!this.isInGuessMode) return;
     
-    this.leafletMap.once('click', (e) => {
-      this.endRound(true, e.latlng);
+    this.leafletMap.on('click', (e) => {
+      this.handleMapClick(e);
     });
-    this.resultsText.setAttribute('value', 'Click on the map to guess!');
+    
+    this.guessBtn.setAttribute('visible', 'false');
+    this.confirmBtn.setAttribute('visible', 'true');
+    this.resultsText.setAttribute('value', 'Click on the map to place your pin\nThen confirm your guess');
+  }
+
+  handleMapClick(e) {
+    // Clear previous markers
+    this.leafletMap.eachLayer(layer => {
+      if (layer instanceof L.Marker) {
+        this.leafletMap.removeLayer(layer);
+      }
+    });
+    
+    // Add new marker
+    L.marker(e.latlng, {
+      icon: L.divIcon({
+        className: 'map-pin',
+        html: '<div style="color:red;font-size:24px">📍</div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24]
+      })
+    }).addTo(this.leafletMap);
+    
+    // Update 3D pin position
+    const bounds = this.leafletMap.getBounds();
+    const mapSize = this.mapPanel.getAttribute('width');
+    const x = ((e.latlng.lng - bounds.getWest()) / (bounds.getEast() - bounds.getWest()) - 0.5) * mapSize;
+    const y = -((e.latlng.lat - bounds.getSouth()) / (bounds.getNorth() - bounds.getSouth()) - 0.5) * (mapSize * 0.625); // Adjust for aspect ratio
+    
+    this.mapPin.setAttribute('position', `${x} ${y} 0.02`);
+    this.mapPin.setAttribute('visible', 'true');
+    
+    this.currentGuess = e.latlng;
+    this.updateMapTexture();
   }
 
   handleControllerTrigger() {
@@ -471,6 +531,16 @@ class VRGeoGuessr {
     }
   }
 
+  submitGuess() {
+    if (!this.currentGuess) {
+      this.resultsText.setAttribute('value', 'Please place a pin on the map first');
+      return;
+    }
+    
+    this.leafletMap.off('click'); // Remove map click listener
+    this.endRound(true, this.currentGuess);
+  }
+
   calculateScore(distance) {
     const maxPoints = 5000;
     const maxDistance = 20000;
@@ -487,7 +557,14 @@ class VRGeoGuessr {
     
     // Show correct location
     this.leafletMap.setView(actualLoc, 12);
-    L.marker(actualLoc).addTo(this.leafletMap);
+    L.marker(actualLoc, {
+      icon: L.divIcon({
+        className: 'correct-pin',
+        html: '<div style="color:green;font-size:24px">📍</div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24]
+      })
+    }).addTo(this.leafletMap);
     this.updateMapTexture();
     
     // Update score if guessed
@@ -509,6 +586,7 @@ class VRGeoGuessr {
     
     this.resultsPanel.setAttribute('visible', 'true');
     this.guessBtn.setAttribute('visible', 'false');
+    this.confirmBtn.setAttribute('visible', 'false');
     
     // Show next round button or end game
     if (this.round < this.totalRounds) {
