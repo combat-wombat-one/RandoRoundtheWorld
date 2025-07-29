@@ -2,17 +2,15 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>VR GeoGuessr with Controller Support</title>
+  <title>VR GeoGuessr with Controllers</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <!-- Add WebXR Polyfill for broader controller support -->
-  <script src="https://cdn.jsdelivr.net/npm/webxr-polyfill@latest/build/webxr-polyfill.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     body {
-      margin: 0; 
+      margin: 0;
       overflow: hidden;
       font-family: Arial, sans-serif;
       background: #000;
@@ -32,22 +30,6 @@
       cursor: pointer;
       z-index: 999;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    
-    #vrButton {
-      position: absolute;
-      top: 60%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 15px 30px;
-      background: #FF9800;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-size: 18px;
-      z-index: 1000;
-      cursor: pointer;
-      display: none;
     }
     
     #loading {
@@ -82,10 +64,9 @@
       position: fixed;
       top: -10000px;
       left: -10000px;
-      width: 512px;
-      height: 320px;
+      width: 1024px;
+      height: 640px;
       background: white;
-      z-index: -1;
     }
     
     #timer {
@@ -100,75 +81,55 @@
       z-index: 1000;
       display: none;
     }
-    
-    /* Controller laser pointer style */
-    .laser-pointer {
-      position: absolute;
-      width: 2px;
-      height: 100px;
-      background-color: red;
-      transform-origin: top center;
-      display: none;
-    }
   </style>
 </head>
 <body>
 
 <button id="startButton">Start Game</button>
-<button id="vrButton">Enter VR</button>
 <div id="loading">Loading assets, please wait...</div>
 <div id="error"></div>
 <div id="timer">02:00</div>
 
-<!-- Offscreen Leaflet map with explicit dimensions -->
-<div id="mapContainer" style="width: 1024px; height: 640px;"></div>
-
-<!-- Laser pointer for controller -->
-<div id="laserPointer" class="laser-pointer"></div>
+<!-- Offscreen Leaflet map -->
+<div id="mapContainer"></div>
 
 <a-scene id="scene" 
          embedded 
-         vr-mode-ui="enabled:true" 
+         vr-mode-ui="enabled: true"
          visible="false" 
          loading-screen="dotsColor: #0080e5; backgroundColor: #000000"
-         webxr="optionalFeatures: local-floor; requiredFeatures: local-floor;"
-         cursor="rayOrigin: mouse">
+         renderer="antialias: true; logarithmicDepthBuffer: true">
          
-  <a-assets id="assets">
-    <!-- Fallback image -->
+  <a-assets>
     <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
   </a-assets>
   
   <a-sky id="sky" color="#000000"></a-sky>
   
-  <!-- Camera rig with controller support -->
-  <a-entity id="cameraRig" position="0 1.6 0">
-    <a-camera id="camera" wasd-controls="enabled: false">
+  <!-- Camera rig with controllers -->
+  <a-entity id="rig" movement-controls="speed: 0.5">
+    <a-entity id="camera" camera position="0 1.6 0" wasd-controls="enabled: false">
       <a-cursor fuse="true" fuse-timeout="800"
                 raycaster="objects: .clickable"
                 material="color: cyan"
                 geometry="radiusInner: 0.005; radiusOuter: 0.015">
       </a-cursor>
-    </a-camera>
+    </a-entity>
     
     <!-- Left controller -->
-    <a-entity id="leftController" hand-controls="hand: left" 
+    <a-entity id="leftHand" 
+              hand-controls="hand: left"
               oculus-touch-controls="hand: left"
-              vive-controls="hand: left"
-              windows-motion-controls="hand: left">
-      <a-entity class="controller-button" 
-                data-button="trigger"
-                visible="false"></a-entity>
+              vive-controls="hand: left">
     </a-entity>
     
     <!-- Right controller -->
-    <a-entity id="rightController" hand-controls="hand: right"
+    <a-entity id="rightHand" 
+              hand-controls="hand: right"
               oculus-touch-controls="hand: right"
               vive-controls="hand: right"
-              windows-motion-controls="hand: right">
-      <a-entity class="controller-button" 
-                data-button="trigger"
-                visible="false"></a-entity>
+              raycaster="objects: .clickable, [data-clickable]"
+              laser-controls="hand: right">
     </a-entity>
   </a-entity>
   
@@ -181,8 +142,8 @@
     <a-text value="Next Round" align="center" color="white" position="0 0 0.01"></a-text>
   </a-plane>
   
-  <!-- Map Panel (fixed size for better rendering) -->
-  <a-plane id="mapPanel" position="-2 1.5 -1.5" width="1.6" height="1" material="shader: flat; side: double">
+  <!-- Map Panel -->
+  <a-plane id="mapPanel" class="clickable" position="-2 1.5 -1.5" width="1.6" height="1" material="shader: flat; side: double">
     <a-text id="locationText" value="Loading..." align="center" position="0 -0.6 0.01" color="black" width="2"></a-text>
   </a-plane>
   
@@ -205,23 +166,12 @@
   </a-entity>
 </a-scene>
 
-<div id="nonVrFallback" class="info-panel" style="display: none;">
-  VR mode not available. Using desktop mode instead.
-</div>
-
 <script>
-// Initialize WebXR Polyfill
-if (navigator.xr === undefined) {
-  new WebXRPolyfill();
-}
-
 // DOM elements
 const startButton = document.getElementById('startButton');
-const vrButton = document.getElementById('vrButton');
 const loadingIndicator = document.getElementById('loading');
 const errorDisplay = document.getElementById('error');
 const scene = document.getElementById('scene');
-const assets = document.getElementById('assets');
 const sky = document.getElementById('sky');
 const guessBtn = document.getElementById('guessBtn');
 const nextRoundBtn = document.getElementById('nextRoundBtn');
@@ -231,289 +181,328 @@ const scoreText = document.getElementById('scoreText');
 const resultsPanel = document.getElementById('resultsPanel');
 const resultsText = document.getElementById('resultsText');
 const nonVrMessage = document.getElementById('nonVrMessage');
-const nonVrFallback = document.getElementById('nonVrFallback');
 const mapContainer = document.getElementById('mapContainer');
 const timerDisplay = document.getElementById('timer');
-const laserPointer = document.getElementById('laserPointer');
-const leftController = document.getElementById('leftController');
-const rightController = document.getElementById('rightController');
+const rightHand = document.getElementById('rightHand');
 
 // Game state
 let data = [];
 let currentIdx = 0;
 let leafletMap;
-let isVRAvailable = false;
 let score = 0;
 let round = 1;
 const totalRounds = 5;
 let timer;
 let timeLeft = 120;
 let isInGuessMode = false;
-let activeController = null;
-let mapInteractionEnabled = false;
 
-// Check VR capabilities
-async function checkVRSupport() {
-  try {
-    if (navigator.xr) {
-      isVRAvailable = await navigator.xr.isSessionSupported('immersive-vr');
-      if (!isVRAvailable) {
-        showNonVRMessage();
-      }
-    } else {
-      showNonVRMessage();
+// Show loading state
+function showLoading(message) {
+  loadingIndicator.textContent = message;
+  loadingIndicator.style.display = 'block';
+}
+
+// Hide loading
+function hideLoading() {
+  loadingIndicator.style.display = 'none';
+}
+
+// Show error
+function showError(message) {
+  errorDisplay.textContent = message;
+  errorDisplay.style.display = 'block';
+  setTimeout(() => {
+    errorDisplay.style.display = 'none';
+  }, 5000);
+}
+
+// Update timer display
+function updateTimer() {
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// Start timer
+function startTimer() {
+  timerDisplay.style.display = 'block';
+  updateTimer();
+  timer = setInterval(() => {
+    timeLeft--;
+    updateTimer();
+    
+    if (timeLeft <= 0) {
+      clearInterval(timer);
+      endRound(false);
     }
-  } catch (e) {
-    console.error("VR check failed:", e);
-    showNonVRMessage();
-  }
+  }, 1000);
 }
 
-function showNonVRMessage() {
-  nonVrMessage.setAttribute('visible', 'true');
-  nonVrFallback.style.display = 'block';
-  isVRAvailable = false;
+// Reset timer for new round
+function resetTimer() {
+  clearInterval(timer);
+  timeLeft = 120;
+  updateTimer();
 }
 
-// Initialize Leaflet map with proper rendering
+// Load CSV data
+function loadCSV() {
+  showLoading('Loading location data...');
+  
+  return new Promise((resolve, reject) => {
+    Papa.parse('locations.csv', {
+      download: true,
+      header: true,
+      complete(r) {
+        hideLoading();
+        data = r.data.filter(row => row.filename && row.latitude && row.longitude);
+        
+        if (data.length === 0) {
+          const error = 'No valid data found in CSV. Ensure it has filename, latitude, and longitude columns.';
+          showError(error);
+          reject(error);
+          return;
+        }
+        
+        resolve(data);
+      },
+      error(err) {
+        const error = `Failed to load CSV: ${err.message}`;
+        showError(error);
+        reject(error);
+      }
+    });
+  });
+}
+
+// Preload images
+function preloadImages() {
+  showLoading('Preloading images...');
+  
+  let loadedCount = 0;
+  const totalImages = data.length;
+  
+  return new Promise((resolve) => {
+    data.forEach((row, i) => {
+      const img = new Image();
+      img.id = `img-${i}`;
+      img.crossOrigin = 'anonymous';
+      img.src = `Images/${row.filename.trim()}`;
+      
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === totalImages) {
+          hideLoading();
+          resolve();
+        }
+      };
+      
+      img.onerror = () => {
+        console.error(`Failed to load image: ${row.filename}`);
+        row.failedToLoad = true;
+        loadedCount++;
+        
+        if (loadedCount === totalImages) {
+          hideLoading();
+          resolve();
+        }
+      };
+    });
+  });
+}
+
+// Initialize Leaflet map with retry logic
 function initMap() {
-  // Clear any existing map
   if (leafletMap) {
     leafletMap.remove();
   }
 
-  // Create map with explicit size
   leafletMap = L.map(mapContainer, {
     center: [0, 0],
     zoom: 1,
     zoomControl: false,
     attributionControl: false,
-    dragging: true,
-    scrollWheelZoom: true,
-    doubleClickZoom: true,
-    boxZoom: true,
-    keyboard: true,
-    preferCanvas: true // Better for html2canvas
+    preferCanvas: true
   });
 
-  // Use a tile layer with proper CORS headers
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 18,
-    attribution: '',
     crossOrigin: true
   }).addTo(leafletMap);
 
-  // Force redraw to ensure tiles load
+  // Force initial render
   setTimeout(() => {
     leafletMap.invalidateSize();
     updateMapTexture();
   }, 500);
 }
 
-// Improved map texture rendering
+// Update map texture
 function updateMapTexture() {
-  // Ensure map is properly sized
-  leafletMap.invalidateSize();
-  
-  // Use html2canvas with proper settings
   html2canvas(mapContainer, {
     backgroundColor: null,
     scale: 1,
-    logging: false,
     useCORS: true,
     allowTaint: true,
-    ignoreElements: (element) => {
-      // Ignore map attribution if present
-      return element.classList && element.classList.contains('leaflet-control-attribution');
-    }
+    logging: false
   }).then(canvas => {
-    // Create texture with proper settings
     const texture = new THREE.CanvasTexture(canvas);
     texture.anisotropy = 16;
     texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.needsUpdate = true;
-
-    // Apply to map panel
+    
     const mesh = mapPanel.getObject3D('mesh');
     if (mesh) {
       mesh.material.map = texture;
       mesh.material.needsUpdate = true;
     }
   }).catch(err => {
-    console.error('Map texture error:', err);
-    // Retry if failed
+    console.error('Map render error:', err);
     setTimeout(updateMapTexture, 500);
   });
 }
 
-// Controller support functions
-function setupControllerEvents() {
-  // Handle controller connected
-  scene.addEventListener('controllerconnected', (evt) => {
-    activeController = evt.detail.component.el;
-    console.log('Controller connected:', activeController.id);
-    
-    // Show laser pointer
-    laserPointer.style.display = 'block';
-    
-    // Add trigger event listeners
-    activeController.addEventListener('triggerdown', () => {
-      if (isInGuessMode && mapInteractionEnabled) {
-        handleMapClick();
-      } else {
-        handleUIClick();
-      }
-    });
-  });
-
-  // Handle controller disconnected
-  scene.addEventListener('controllerdisconnected', () => {
-    console.log('Controller disconnected');
-    activeController = null;
-    laserPointer.style.display = 'none';
-  });
-
-  // Update laser pointer position
-  scene.addEventListener('controllerupdated', (evt) => {
-    if (activeController) {
-      const controller = evt.detail.component.el;
-      if (controller === activeController) {
-        updateLaserPointer(controller);
-      }
+// Set random image for new round
+function setRandomImage() {
+  const randomIdx = Math.floor(Math.random() * data.length);
+  currentIdx = randomIdx;
+  const location = data[currentIdx];
+  
+  // Set sky image
+  const imgId = location.failedToLoad ? '#fallback' : `#img-${currentIdx}`;
+  sky.setAttribute('src', imgId);
+  sky.setAttribute('color', '#fff');
+  
+  // Reset map for guessing
+  leafletMap.setView([0, 0], 1);
+  leafletMap.eachLayer(layer => {
+    if (layer instanceof L.Marker) {
+      leafletMap.removeLayer(layer);
     }
   });
+  updateMapTexture();
+  
+  // Update UI
+  guessBtn.setAttribute('visible', 'true');
+  nextRoundBtn.setAttribute('visible', 'false');
+  resultsPanel.setAttribute('visible', 'false');
+  isInGuessMode = true;
+  
+  // Start timer
+  resetTimer();
+  startTimer();
 }
 
-function updateLaserPointer(controller) {
-  // Get controller position and rotation
-  const position = new THREE.Vector3();
-  const rotation = new THREE.Quaternion();
-  controller.object3D.getWorldPosition(position);
-  controller.object3D.getWorldQuaternion(rotation);
-  
-  // Convert to screen coordinates for 2D laser pointer
-  // (Simplified approach - for full 3D laser, you'd need a different method)
-  const camera = document.getElementById('camera').object3D;
-  const vector = position.clone().project(camera);
-  
-  vector.x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-  vector.y = -(vector.y * 0.5 - 0.5) * window.innerHeight;
-  
-  laserPointer.style.left = `${vector.x}px`;
-  laserPointer.style.top = `${vector.y}px`;
-  
-  // Check if pointing at map
-  const raycaster = new THREE.Raycaster();
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(rotation);
-  raycaster.set(position, direction);
-  
-  const intersects = raycaster.intersectObject(mapPanel.getObject3D('mesh'));
-  mapInteractionEnabled = intersects.length > 0;
+// Calculate score based on distance
+function calculateScore(distance) {
+  const maxPoints = 5000;
+  const maxDistance = 20000;
+  const points = Math.max(0, maxPoints * (1 - distance / maxDistance));
+  return Math.round(points);
 }
 
-function handleMapClick() {
-  if (!leafletMap || !activeController) return;
+// End the current round
+function endRound(guessed) {
+  clearInterval(timer);
+  isInGuessMode = false;
   
-  // Get controller raycast intersection with map panel
-  const raycaster = new THREE.Raycaster();
-  const position = new THREE.Vector3();
-  const rotation = new THREE.Quaternion();
+  const location = data[currentIdx];
+  const actualLoc = [parseFloat(location.latitude), parseFloat(location.longitude)];
   
-  activeController.object3D.getWorldPosition(position);
-  activeController.object3D.getWorldQuaternion(rotation);
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(rotation);
-  raycaster.set(position, direction);
+  // Show correct location
+  leafletMap.setView(actualLoc, 12);
+  L.marker(actualLoc).addTo(leafletMap);
+  updateMapTexture();
   
-  const intersects = raycaster.intersectObject(mapPanel.getObject3D('mesh'));
+  // Update score if guessed
+  let roundScore = 0;
+  if (guessed) {
+    const guessLoc = leafletMap.getCenter();
+    const distance = leafletMap.distance(guessLoc, actualLoc);
+    roundScore = calculateScore(distance);
+    score += roundScore;
+  }
   
-  if (intersects.length > 0) {
-    // Convert intersection point to map coordinates
-    const point = intersects[0].point;
-    const mapSize = mapPanel.getAttribute('width');
-    const halfSize = mapSize / 2;
-    
-    // Normalize to -1 to 1 range
-    const x = (point.x / halfSize);
-    const y = -(point.y / halfSize);
-    
-    // Convert to lat/long (approximate)
-    const bounds = leafletMap.getBounds();
-    const lat = bounds.getSouth() + (1 - y) * (bounds.getNorth() - bounds.getSouth());
-    const lng = bounds.getWest() + (x + 1) * (bounds.getEast() - bounds.getWest()) / 2;
-    
-    // Simulate map click
-    leafletMap.fire('click', {
-      latlng: L.latLng(lat, lng),
-      layerPoint: leafletMap.latLngToLayerPoint(L.latLng(lat, lng))
-    });
+  // Show results
+  resultsText.setAttribute('value', 
+    `Round ${round}/${totalRounds}\n` +
+    (guessed ? `Distance: ${(distance/1000).toFixed(1)} km\nPoints: ${roundScore}` : 'Time expired!') +
+    `\nTotal Score: ${score}`);
+  
+  resultsPanel.setAttribute('visible', 'true');
+  guessBtn.setAttribute('visible', 'false');
+  
+  // Show next round button or end game
+  if (round < totalRounds) {
+    nextRoundBtn.setAttribute('visible', 'true');
+  } else {
+    setTimeout(() => {
+      resultsText.setAttribute('value', 
+        `Game Over!\nFinal Score: ${score}\n` +
+        `Average: ${Math.round(score/totalRounds)} per round`);
+    }, 2000);
   }
 }
 
-function handleUIClick() {
-  // Get all clickable elements
-  const clickables = document.querySelectorAll('.clickable');
-  const raycaster = new THREE.Raycaster();
-  const position = new THREE.Vector3();
-  const rotation = new THREE.Quaternion();
-  
-  activeController.object3D.getWorldPosition(position);
-  activeController.object3D.getWorldQuaternion(rotation);
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(rotation);
-  raycaster.set(position, direction);
-  
-  // Check intersections with all clickable elements
-  clickables.forEach(el => {
-    const obj = el.getObject3D('mesh');
-    if (obj) {
-      const intersects = raycaster.intersectObject(obj);
-      if (intersects.length > 0) {
-        el.emit('click');
-        return;
-      }
-    }
-  });
+// Start a new round
+function startNewRound() {
+  round++;
+  setRandomImage();
 }
 
-// [Rest of your existing game code (setRandomImage, calculateScore, etc.) goes here]
-// Note: I've kept the core game logic from previous implementations, just showing the new controller/map fixes
+// Handle controller events
+function setupControllerEvents() {
+  // Right controller trigger for interactions
+  rightHand.addEventListener('triggerdown', () => {
+    if (!isInGuessMode) return;
+    
+    // Get controller raycast intersection
+    const intersection = rightHand.components.raycaster.getIntersection(mapPanel);
+    if (intersection) {
+      // Convert intersection point to map coordinates
+      const point = intersection.point;
+      const mapSize = mapPanel.getAttribute('width');
+      const halfSize = mapSize / 2;
+      
+      // Normalize to -1 to 1 range
+      const x = (point.x / halfSize);
+      const y = -(point.y / halfSize);
+      
+      // Convert to lat/long
+      const bounds = leafletMap.getBounds();
+      const lat = bounds.getSouth() + (1 - y) * (bounds.getNorth() - bounds.getSouth());
+      const lng = bounds.getWest() + (x + 1) * (bounds.getEast() - bounds.getWest()) / 2;
+      
+      // Simulate map click
+      leafletMap.fire('click', {
+        latlng: L.latLng(lat, lng),
+        layerPoint: leafletMap.latLngToLayerPoint(L.latLng(lat, lng))
+      });
+    }
+  });
+
+  // UI button interactions
+  document.querySelectorAll('.clickable').forEach(el => {
+    el.addEventListener('click', () => {
+      if (isInGuessMode) return;
+      el.emit('click');
+    });
+  });
+}
 
 // Initialize the experience
 async function initExperience() {
   try {
-    await checkVRSupport();
     await loadCSV();
     await preloadImages();
-    
-    // Initialize map with retry logic
-    let mapAttempts = 0;
-    const initMapWithRetry = () => {
-      try {
-        initMap();
-        mapAttempts++;
-        if (!leafletMap && mapAttempts < 3) {
-          setTimeout(initMapWithRetry, 500);
-        }
-      } catch (e) {
-        console.error("Map init error:", e);
-        if (mapAttempts < 3) {
-          setTimeout(initMapWithRetry, 500);
-        }
-      }
-    };
-    initMapWithRetry();
-    
-    // Setup controller support
-    setupControllerEvents();
+    initMap();
     
     scene.setAttribute('visible', 'true');
     startButton.style.display = 'none';
     
-    if (isVRAvailable) {
-      vrButton.style.display = 'block';
-    }
+    // Setup controller events
+    setupControllerEvents();
     
-    // Set up event listeners
+    // Set up game event listeners
     guessBtn.addEventListener('click', () => {
       leafletMap.once('click', (e) => {
         endRound(true);
@@ -522,14 +511,6 @@ async function initExperience() {
     });
     
     nextRoundBtn.addEventListener('click', startNewRound);
-    
-    // VR button handler
-    vrButton.addEventListener('click', () => {
-      scene.enterVR().catch(err => {
-        console.error('Failed to enter VR:', err);
-        showError('Failed to enter VR. Ensure your headset is connected and WebXR is supported.');
-      });
-    });
     
     // Start first round
     setRandomImage();
@@ -546,8 +527,6 @@ startButton.addEventListener('click', initExperience);
 
 // Sample data fallback for local testing
 if (window.location.href.includes('localhost') || window.location.href.includes('127.0.0.1')) {
-  console.log('Localhost detected - adding test data fallback');
-  
   window.fallbackData = [
     {filename: 'pano1.jpg', latitude: '40.7128', longitude: '-74.0060', name: 'New York'},
     {filename: 'pano2.jpg', latitude: '51.5074', longitude: '-0.1278', name: 'London'},
@@ -558,18 +537,12 @@ if (window.location.href.includes('localhost') || window.location.href.includes(
   
   setTimeout(() => {
     if (data.length === 0 && window.fallbackData) {
-      console.log('Using fallback data');
       data = window.fallbackData;
       preloadImages();
       initMap();
     }
   }, 3000);
 }
-
-// Include all the remaining game functions from previous implementation
-// (setRandomImage, calculateScore, endRound, startNewRound, etc.)
-// These should be copied exactly as they were in the previous complete solution
-
 </script>
 </body>
 </html>
