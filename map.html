@@ -18,7 +18,6 @@
 
     let roundElements = [];
 
-    // Listen for commands from the main game window
     window.addEventListener('message', (event) => {
         const { command, data } = event.data;
 
@@ -32,7 +31,8 @@
                 map.setView(data.center, data.zoom);
                 break;
 
-            case 'placeGuessPin':
+            // *** FIX: Added curly braces to create a new block scope ***
+            case 'placeGuessPin': {
                 const guessLatLng = L.latLng(data.latlng.lat, data.latlng.lng);
                 if (roundElements.length > 0 && roundElements[0] instanceof L.Marker) {
                     roundElements[0].setLatLng(guessLatLng);
@@ -41,8 +41,10 @@
                     roundElements.unshift(guessMarker);
                 }
                 break;
+            }
 
-            case 'showResults':
+            // *** FIX: Added curly braces to create a new block scope ***
+            case 'showResults': {
                 const { guessLatLng, actualLoc } = data;
                 const guessPoint = L.latLng(guessLatLng.lat, guessLatLng.lng);
                 const actualPoint = L.latLng(actualLoc[0], actualLoc[1]);
@@ -55,10 +57,10 @@
                 
                 map.fitBounds(line.getBounds().pad(0.2));
 
-                // *** FIX: Calculate distance and send it back to the main game ***
                 const distance = map.distance(guessPoint, actualPoint);
                 parent.postMessage({ command: 'distanceCalculated', data: { distance: distance } }, '*');
                 break;
+            }
         }
     });
 </script>
