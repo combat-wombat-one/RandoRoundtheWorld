@@ -31,15 +31,18 @@
              
       <a-assets id="assets-container">
         <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
-        <!-- Pano images for the session will be added here by the script -->
       </a-assets>
       
       <a-sky id="sky" material="shader: flat; color: #333"></a-sky>
       
       <a-entity id="cameraRig" position="0 1.6 0">
         <a-camera id="camera" wasd-controls-enabled="false">
-          <a-entity id="vrLoadingText" visible="false" position="0 0 -1.5">
-              <a-entity troika-text="value: Loading...; align: center; color: white; fontSize: 0.1;"></a-entity>
+          <a-entity id="vrLoadingUI" visible="false" position="0 0 -1.5">
+              <a-entity id="loadingText" troika-text="value: Loading...; align: center; color: white; fontSize: 0.1;"></a-entity>
+              <a-entity id="progressBar" position="0 -0.15 0" visible="false">
+                <a-plane id="progressBarBg" width="1" height="0.05" color="#555555"></a-plane>
+                <a-plane id="progressBarFill" width="0" height="0.05" color="#4CAF50" position="-0.5 0 0.001" align="left"></a-plane>
+              </a-entity>
           </a-entity>
         </a-camera>
         <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .clickable; far: 20;"></a-entity>
@@ -84,13 +87,17 @@
 <script>
 class VRGeoGuessr {
   constructor() {
+    this.aframeWrapper = document.getElementById('aframe-wrapper');
     this.mapContainer = document.getElementById('mapContainer');
     this.startButton = document.getElementById('startButton');
     this.scene = document.getElementById('scene');
     this.assetsContainer = document.getElementById('assets-container');
     this.sky = document.getElementById('sky');
     this.uiWrapper = document.getElementById('uiWrapper');
-    this.vrLoadingText = document.getElementById('vrLoadingText');
+    this.vrLoadingUI = document.getElementById('vrLoadingUI');
+    this.loadingText = document.getElementById('loadingText');
+    this.progressBar = document.getElementById('progressBar');
+    this.progressBarFill = document.getElementById('progressBarFill');
     this.guessBtn = document.getElementById('guessBtn');
     this.confirmBtn = document.getElementById('confirmBtn');
     this.nextRoundBtn = document.getElementById('nextRoundBtn');
@@ -103,17 +110,10 @@ class VRGeoGuessr {
     this.resultsPanel = document.getElementById('resultsPanel');
     this.resultsText = document.getElementById('resultsText');
 
-    this.data = [];
-    this.gamePlaylist = [];
-    this.leafletMap = null;
-    this.roundElements = [];
-    this.score = 0;
-    this.round = 0;
-    this.totalRounds = 5;
-    this.timer = null;
-    this.timeLeft = 120;
-    this.currentGuess = null;
-    this.acceptingInput = false;
+    this.data = []; this.gamePlaylist = []; this.leafletMap = null;
+    this.roundElements = []; this.score = 0; this.round = 0;
+    this.totalRounds = 5; this.timer = null; this.timeLeft = 120;
+    this.currentGuess = null; this.acceptingInput = false;
 
     this.bindEvents();
   }
@@ -131,36 +131,32 @@ class VRGeoGuessr {
   }
 
   initExperience() {
-    console.log("Initializing VR Experience...");
+    console.log("==> Initializing VR Experience...");
     this.startButton.style.display = 'none';
     document.body.classList.remove('splash-background');
-    
     this.scene.setAttribute('visible', 'true');
-    this.vrLoadingText.setAttribute('visible', 'true');
+    this.vrLoadingUI.setAttribute('visible', 'true');
     this.scene.enterVR().then(() => this.loadAndStartGame())
       .catch(err => { console.error("Could not enter VR mode:", err); this.loadAndStartGame(); });
   }
   
   async loadAndStartGame() {
-    console.log("VR Session started. Loading assets...");
+    console.log("==> VR Session started. Loading assets...");
     try {
         const controllerPromise = new Promise(resolve => this.scene.addEventListener('controllerconnected', resolve, { once: true }));
         this.initMap();
         await this.loadCSV();
         this.generateGamePlaylist();
-        
-        // *** FIX: Preload only the images for this session to leverage caching ***
         await this.preloadPlaylistImages();
-
         console.log("Waiting for controllers to connect...");
         await controllerPromise;
         console.log("Controllers connected.");
         
         this.uiWrapper.setAttribute('visible', 'true');
-        this.vrLoadingText.setAttribute('visible', 'false');
+        this.vrLoadingUI.setAttribute('visible', 'false');
         this.startNewRound();
     } catch(error) {
-        this.vrLoadingText.setAttribute('troika-text', 'value', `Error: ${error.message}`);
+        this.loadingText.setAttribute('troika-text', 'value', `Error: ${error.message}`);
     }
   }
 
@@ -182,12 +178,12 @@ class VRGeoGuessr {
 
   async loadCSV() {
     return new Promise((resolve, reject) => {
-      this.vrLoadingText.setAttribute('troika-text', 'value', 'Loading location data...');
+      this.loadingText.setAttribute('troika-text', 'value', 'Loading location data...');
       Papa.parse('locations.csv', { download: true, header: true, skipEmptyLines: true,
         complete: (r) => {
           this.data = r.data.map((row, index) => ({...row, id: `loc-${index}`}));
           if (this.data.length === 0) return reject(new Error('No valid locations in CSV'));
-          console.log("CSV data loaded.");
+          console.log("CSV data loaded successfully.");
           resolve();
         }, error: (err) => reject(new Error(`CSV Error: ${err.message}`))
       });
@@ -200,20 +196,30 @@ class VRGeoGuessr {
       console.log("Game playlist generated:", this.gamePlaylist.map(p => p.filename));
   }
   
-  // *** NEW: Preloads only the 5 images needed for the current game session ***
   preloadPlaylistImages() {
       console.log("Preloading images for this session...");
-      this.vrLoadingText.setAttribute('troika-text', 'value', 'Loading round images...');
+      this.progressBar.setAttribute('visible', 'true');
+      let loadedCount = 0;
+      const totalImages = this.gamePlaylist.length;
+      this.loadingText.setAttribute('troika-text', 'value', `Loading Images (0/${totalImages})...`);
+
       const imageLoadPromises = this.gamePlaylist.map(location => {
-          return new Promise((resolve, reject) => {
+          return new Promise((resolve) => {
               const img = document.createElement('img');
               img.id = `img-${location.id}`;
               img.crossOrigin = 'anonymous';
-              img.onload = resolve;
+              const onFinish = () => {
+                  loadedCount++;
+                  const progress = loadedCount / totalImages;
+                  this.loadingText.setAttribute('troika-text', 'value', `Loading Images (${loadedCount}/${totalImages})`);
+                  this.progressBarFill.setAttribute('width', progress);
+                  resolve();
+              };
+              img.onload = onFinish;
               img.onerror = () => {
                   console.error(`Failed to load session image: ${location.filename}`);
                   location.failedToLoad = true;
-                  resolve(); // Resolve even on error to not block the game
+                  onFinish();
               };
               img.src = `Images/${location.filename.trim()}`;
               this.assetsContainer.appendChild(img);
@@ -230,7 +236,12 @@ class VRGeoGuessr {
   }
 
   updateMapTexture() {
-    console.log("Requesting map texture update...");
+    console.log("==> MAP TEXTURE UPDATE SEQUENCE START");
+    this.vrLoadingUI.setAttribute('visible', 'true');
+    this.loadingText.setAttribute('troika-text', 'value', 'Rendering Map...');
+    this.progressBar.setAttribute('visible', 'false');
+    this.aframeWrapper.style.display = 'none';
+
     setTimeout(() => {
         html2canvas(this.mapContainer, { useCORS: true, logging: false, scale: 0.75 }).then(canvas => {
             const texture = new THREE.CanvasTexture(canvas);
@@ -239,27 +250,32 @@ class VRGeoGuessr {
             if (mesh && mesh.material) {
                 mesh.material.map = texture;
                 mesh.material.needsUpdate = true;
+                console.log("Map texture applied successfully.");
             }
-        }).catch(err => { console.error("html2canvas error:", err); });
-    }, 200); 
+            this.aframeWrapper.style.display = 'block';
+            this.vrLoadingUI.setAttribute('visible', 'false');
+            console.log("==> MAP TEXTURE UPDATE SEQUENCE END");
+        }).catch(err => { 
+            console.error("html2canvas error:", err);
+            this.aframeWrapper.style.display = 'block';
+            this.vrLoadingUI.setAttribute('visible', 'false');
+        });
+    }, 50); 
   }
   
   setUIState(state) {
       console.log(`Setting UI state to: ${state}`);
-      
       this.guessBtn.setAttribute('visible', false);
       this.guessBtn.classList.remove('clickable');
       this.confirmBtn.setAttribute('visible', false);
       this.confirmBtn.classList.remove('clickable');
       this.nextRoundBtn.setAttribute('visible', false);
       this.nextRoundBtn.classList.remove('clickable');
-
       this.mapWrapper.setAttribute('visible', false);
       this.resultsPanel.setAttribute('visible', false);
       
       switch(state) {
-          case 'LOADING':
-              break;
+          case 'LOADING': break;
           case 'AWAITING_GUESS':
               this.guessBtn.setAttribute('visible', true);
               this.guessBtn.classList.add('clickable');
@@ -284,8 +300,8 @@ class VRGeoGuessr {
       }
   }
 
-  startNewRound() {
-    console.log(`Starting round ${this.round + 1}`);
+  async startNewRound() {
+    console.log(`==> Starting round ${this.round + 1} of ${this.totalRounds}`);
     this.cleanupPreviousRound();
     this.round++;
     if (this.round > this.totalRounds) {
@@ -300,10 +316,9 @@ class VRGeoGuessr {
     const location = this.gamePlaylist[this.round - 1];
     this.currentLocation = location;
     
-    // *** FIX: Sky now uses the preloaded image, preventing re-downloads ***
     const skySrc = location.failedToLoad ? '#fallback' : `#img-${location.id}`;
     this.sky.setAttribute('src', skySrc);
-    console.log(`Setting sky source to ${skySrc}`);
+    console.log(`Sky source set to: ${skySrc}`);
     
     this.setUIState('AWAITING_GUESS');
     this.resetTimer(); this.startTimer();
@@ -311,13 +326,13 @@ class VRGeoGuessr {
   }
 
   cleanupPreviousRound() {
-    console.log("Cleaning up previous round.");
+    console.log("Cleaning up previous round elements.");
     this.roundElements.forEach(el => this.leafletMap.removeLayer(el));
     this.roundElements = [];
   }
 
   startGuessing() {
-    console.log("UI State: PLACING_GUESS");
+    console.log("==> User started guessing.");
     this.setUIState('PLACING_GUESS');
     this.locationText.setAttribute('troika-text', 'value', 'Point on the map to place your guess');
     this.leafletMap.setView([20, 0], 2);
@@ -345,7 +360,7 @@ class VRGeoGuessr {
 
   submitGuess() {
     if (!this.currentGuess) { this.locationText.setAttribute('troika-text', 'value', 'Please place a pin on the map first'); return; }
-    console.log("Guess submitted.");
+    console.log("==> Guess submitted.");
     this.endRound(true, this.currentGuess);
   }
 
@@ -354,7 +369,7 @@ class VRGeoGuessr {
   }
 
   endRound(guessed, guessLatLng) {
-    console.log("Ending round.");
+    console.log("==> Ending round.");
     this.acceptingInput = false; clearInterval(this.timer);
     this.mapPin.setAttribute('visible', 'false');
 
