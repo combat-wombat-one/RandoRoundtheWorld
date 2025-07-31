@@ -2,121 +2,94 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>VR GeoGuessr - MapLibre Optimized</title>
+  <title>VR GeoGuessr - Final Polished Version</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://unpkg.com/aframe-troika-text/dist/aframe-troika-text.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <!-- *** FIX: Replaced Leaflet with MapLibre GL JS *** -->
-  <script src='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js'></script>
-  <link href='https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css' rel='stylesheet' />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap" rel="stylesheet">
 <style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    font-family: Arial, sans-serif;
-    background: url('splash.png') no-repeat center center fixed;
-    background-size: cover;
-  }
-  #startButton {
-    font-family: 'Orbitron', sans-serif;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    padding: 20px 40px;
-    font-size: 30px;
-    background: #e0202d;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    z-index: 999;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-  }
-  #mapContainer {
-    position: fixed;
-    top: -10000px;
-    left: -10000px;
-    width: 1024px;
-    height: 640px;
-  }
+  body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+  .splash-background { background: url('splash.png') no-repeat center center fixed; background-size: cover; }
+  #startButton { font-family: 'Orbitron', sans-serif; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 30px; background: #e0202d; color: #fff; border: none; border-radius: 5px; cursor: pointer; z-index: 999; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+  #mapContainer { position: fixed; top: -10000px; left: -10000px; width: 1024px; height: 640px; background: white; }
 </style>
 </head>
-<body>
+<body class="splash-background">
 
 <button id="startButton">Click me with your Controller to Start Game!</button>
 <div id="mapContainer"></div>
 
-<a-scene id="scene" 
-         webxr="referenceSpaceType: local-floor"
-         vr-mode-ui="enabled: true"
-         renderer="antialias: true; logarithmicDepthBuffer: true"
-         visible="false">
-         
-  <a-assets id="assets-container">
-    <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
-    <!-- *** FIX: A single, reusable image element for the panorama *** -->
-    <img id="pano-image" crossorigin="anonymous">
-  </a-assets>
-  
-  <a-sky id="sky" material="shader: flat; color: #333"></a-sky>
-  
-  <a-entity id="cameraRig" position="0 1.6 0">
-    <a-camera id="camera" wasd-controls-enabled="false">
-      <a-entity id="vrLoadingText" visible="false" position="0 0 -1.5">
-          <a-entity troika-text="value: Loading...; align: center; color: white; fontSize: 0.1;"></a-entity>
-      </a-entity>
-    </a-camera>
-    <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .clickable; far: 20;"></a-entity>
-  </a-entity>
-  
-  <a-entity id="uiWrapper" visible="false">
-      <a-entity id="gameUI" position="0 1.2 -2.5">
-        <a-plane id="guessBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
-            <a-entity troika-text="value: MAKE GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
-        </a-plane>
-        <a-plane id="confirmBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#FF9800" visible="false">
-            <a-entity troika-text="value: CONFIRM GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
-        </a-plane>
-        <a-plane id="nextRoundBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
-            <a-entity troika-text="value: NEXT ROUND; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
-        </a-plane>
+<!-- *** FIX: Wrap the scene in a div to prevent html2canvas from traversing it *** -->
+<div id="aframe-wrapper">
+    <a-scene id="scene" 
+             webxr="referenceSpaceType: local-floor"
+             vr-mode-ui="enabled: true"
+             renderer="antialias: true; logarithmicDepthBuffer: true"
+             visible="false">
+             
+      <a-assets id="assets-container">
+        <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
+        <img id="pano-image" crossorigin="anonymous">
+      </a-assets>
+      
+      <a-sky id="sky" material="shader: flat; color: #333"></a-sky>
+      
+      <a-entity id="cameraRig" position="0 1.6 0">
+        <a-camera id="camera" wasd-controls-enabled="false">
+          <a-entity id="vrLoadingText" visible="false" position="0 0 -1.5">
+              <a-entity troika-text="value: Loading...; align: center; color: white; fontSize: 0.1;"></a-entity>
+          </a-entity>
+        </a-camera>
+        <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .clickable; far: 20;"></a-entity>
       </a-entity>
       
-      <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
-        <a-plane id="mapPanel" class="clickable" width="2" height="1.25" material="shader: flat; side: double; transparent: true;">
-          <a-entity id="locationText" position="0 -0.75 0.01" troika-text="value:; align: center; color: black; fontSize: 0.06; outlineWidth: 0.005; outlineColor: #FFF; font: Orbitron.ttf;" ></a-entity>
-        </a-plane>
-        <a-entity id="mapPin" visible="false">
-            <a-cone color="red" radius-bottom="0.03" radius-top="0" height="0.1" position="0 0.05 0.01" rotation="-90 0 0"></a-cone>
-        </a-entity>
+      <a-entity id="uiWrapper" visible="false">
+          <a-entity id="gameUI" position="0 1.2 -2.5">
+            <a-plane id="guessBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
+                <a-entity troika-text="value: MAKE GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
+            </a-plane>
+            <a-plane id="confirmBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#FF9800" visible="false">
+                <a-entity troika-text="value: CONFIRM GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
+            </a-plane>
+            <a-plane id="nextRoundBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
+                <a-entity troika-text="value: NEXT ROUND; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
+            </a-plane>
+          </a-entity>
+          
+          <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
+            <a-plane id="mapPanel" class="clickable" width="2" height="1.25" material="shader: flat; side: double; transparent: true;">
+              <a-entity id="locationText" position="0 -0.75 0.01" troika-text="value:; align: center; color: black; fontSize: 0.06; outlineWidth: 0.005; outlineColor: #FFF; font: Orbitron.ttf;" ></a-entity>
+            </a-plane>
+            <a-entity id="mapPin" visible="false">
+                <a-cone color="red" radius-bottom="0.03" radius-top="0" height="0.1" position="0 0.05 0.01" rotation="-90 0 0"></a-cone>
+            </a-entity>
+          </a-entity>
+          
+          <a-entity id="scoreAndTimer" position="0 2.8 -2.5">
+            <a-entity id="scoreText" position="0 0 0" troika-text="value: SCORE: 0; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
+            <a-entity id="timerText" position="0.9 0 0" troika-text="value: 02:00; align: right; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
+          </a-entity>
+          
+          <a-entity id="resultsPanel" position="0 1.9 -2.5" visible="false">
+            <a-plane width="2.2" height="1.2" color="#333333" opacity="0.9">
+              <a-entity id="resultsText" position="0 0 0.01" troika-text="value:; align: center; color: white; fontSize: 0.07; whiteSpace: normal; maxWidth: 2; font: Orbitron.ttf;"></a-entity>
+            </a-plane>
+          </a-entity>
       </a-entity>
-      
-      <a-entity id="scoreAndTimer" position="0 2.8 -2.5">
-        <a-entity id="scoreText" position="0 0 0" troika-text="value: SCORE: 0; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
-        <a-entity id="timerText" position="0.9 0 0" troika-text="value: 02:00; align: right; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
-      </a-entity>
-      
-      <a-entity id="resultsPanel" position="0 1.9 -2.5" visible="false">
-        <a-plane width="2.2" height="1.2" color="#333333" opacity="0.9">
-          <a-entity id="resultsText" position="0 0 0.01" troika-text="value:; align: center; color: white; fontSize: 0.07; whiteSpace: normal; maxWidth: 2; font: Orbitron.ttf;"></a-entity>
-        </a-plane>
-      </a-entity>
-  </a-entity>
-</a-scene>
+    </a-scene>
+</div>
 
 <script>
 class VRGeoGuessr {
   constructor() {
-    // DOM Elements
     this.mapContainer = document.getElementById('mapContainer');
     this.startButton = document.getElementById('startButton');
     this.scene = document.getElementById('scene');
     this.sky = document.getElementById('sky');
     this.panoImage = document.getElementById('pano-image');
-
-    // UI Elements
     this.uiWrapper = document.getElementById('uiWrapper');
     this.vrLoadingText = document.getElementById('vrLoadingText');
     this.guessBtn = document.getElementById('guessBtn');
@@ -131,11 +104,10 @@ class VRGeoGuessr {
     this.resultsPanel = document.getElementById('resultsPanel');
     this.resultsText = document.getElementById('resultsText');
 
-    // State
     this.data = [];
     this.gamePlaylist = [];
-    this.map = null;
-    this.guessMarker = null;
+    this.leafletMap = null;
+    this.roundElements = [];
     this.score = 0;
     this.round = 0;
     this.totalRounds = 5;
@@ -160,7 +132,10 @@ class VRGeoGuessr {
   }
 
   initExperience() {
+    console.log("Initializing VR Experience...");
     this.startButton.style.display = 'none';
+    document.body.classList.remove('splash-background');
+    
     this.scene.setAttribute('visible', 'true');
     this.vrLoadingText.setAttribute('visible', 'true');
     this.scene.enterVR().then(() => this.loadAndStartGame())
@@ -227,8 +202,6 @@ class VRGeoGuessr {
         console.log(`Loading image: ${location.filename}`);
         this.vrLoadingText.setAttribute('troika-text', 'value', 'Loading new location...');
         this.vrLoadingText.setAttribute('visible', 'true');
-
-        // This is the core of the new method: just update the src.
         this.panoImage.onload = () => {
             console.log("Image loaded successfully.");
             this.vrLoadingText.setAttribute('visible', 'false');
@@ -240,57 +213,63 @@ class VRGeoGuessr {
             this.vrLoadingText.setAttribute('visible', 'false');
             reject(new Error(`Failed to load image: ${location.filename}`));
         };
-
         this.panoImage.src = `Images/${location.filename.trim()}`;
     });
   }
 
   initMap() {
-    if (this.map) this.map.remove();
-    // *** ACTION REQUIRED: PASTE YOUR MAPTILER API KEY HERE ***
-    const apiKey = '3AA53Tgefmb5xFuXQEZk'; // <--- PASTE KEY HERE
-
-    this.map = new maplibregl.Map({
-        container: this.mapContainer,
-        style: `https://api.maptiler.com/maps/streets/style.json?key=${apiKey}`,
-        center: [0, 0],
-        zoom: 1,
-        interactive: false,
-        preserveDrawingBuffer: true // CRITICAL for canvas capture
-    });
-
-    this.map.on('render', () => this.updateMapTexture());
-    console.log("MapLibre map initialized.");
+    console.log("Initializing Leaflet map...");
+    if (this.leafletMap) this.leafletMap.remove();
+    this.leafletMap = L.map(this.mapContainer, { center: [0, 0], zoom: 1, zoomControl: false, attributionControl: false, preferCanvas: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, crossOrigin: true }).addTo(this.leafletMap);
   }
 
   updateMapTexture() {
-    const canvas = this.map.getCanvas();
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const mesh = this.mapPanel.getObject3D('mesh');
-    if (mesh && mesh.material) {
-        mesh.material.map = texture;
-        mesh.material.needsUpdate = true;
-    }
+    console.log("Requesting map texture update...");
+    setTimeout(() => {
+        html2canvas(this.mapContainer, { useCORS: true, logging: false, scale: 0.75 }).then(canvas => {
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.minFilter = THREE.LinearFilter;
+            const mesh = this.mapPanel.getObject3D('mesh');
+            if (mesh && mesh.material) {
+                mesh.material.map = texture;
+                mesh.material.needsUpdate = true;
+                console.log("Map texture successfully applied.");
+            }
+        }).catch(err => { console.error("html2canvas error:", err); });
+    }, 200); 
   }
   
   setUIState(state) {
       console.log(`Setting UI state to: ${state}`);
-      const states = {
-          LOADING: { guess: false, confirm: false, next: false, map: false, results: false },
-          AWAITING_GUESS: { guess: true, confirm: false, next: false, map: false, results: false },
-          PLACING_GUESS: { guess: false, confirm: true, next: false, map: true, results: false },
-          SHOWING_RESULTS: { guess: false, confirm: false, next: this.round < this.totalRounds, map: true, results: true },
-          GAME_OVER: { guess: false, confirm: false, next: false, map: true, results: true }
-      };
-      const currentState = states[state];
-      if (!currentState) return;
+      this.guessBtn.setAttribute('visible', false);
+      this.confirmBtn.setAttribute('visible', false);
+      this.nextRoundBtn.setAttribute('visible', false);
+      this.mapWrapper.setAttribute('visible', false);
+      this.resultsPanel.setAttribute('visible', false);
       
-      this.guessBtn.setAttribute('visible', currentState.guess);
-      this.confirmBtn.setAttribute('visible', currentState.confirm);
-      this.nextRoundBtn.setAttribute('visible', currentState.next);
-      this.mapWrapper.setAttribute('visible', currentState.map);
-      this.resultsPanel.setAttribute('visible', currentState.results);
+      switch(state) {
+          case 'LOADING':
+              break;
+          case 'AWAITING_GUESS':
+              this.guessBtn.setAttribute('visible', true);
+              break;
+          case 'PLACING_GUESS':
+              this.confirmBtn.setAttribute('visible', true);
+              this.mapWrapper.setAttribute('visible', true);
+              break;
+          case 'SHOWING_RESULTS':
+              this.mapWrapper.setAttribute('visible', true);
+              this.resultsPanel.setAttribute('visible', true);
+              if (this.round < this.totalRounds) {
+                  this.nextRoundBtn.setAttribute('visible', true);
+              }
+              break;
+          case 'GAME_OVER':
+              this.mapWrapper.setAttribute('visible', true);
+              this.resultsPanel.setAttribute('visible', true);
+              break;
+      }
   }
 
   async startNewRound() {
@@ -327,41 +306,40 @@ class VRGeoGuessr {
 
   cleanupPreviousRound() {
     console.log("Cleaning up previous round.");
-    if (this.guessMarker) { this.guessMarker.remove(); this.guessMarker = null; }
-    if (this.map.getLayer('answer-line')) this.map.removeLayer('answer-line');
-    if (this.map.getSource('answer-line')) this.map.removeSource('answer-line');
-    if (this.map.getLayer('correct-pin')) this.map.removeLayer('correct-pin');
-    if (this.map.getSource('correct-pin')) this.map.removeSource('correct-pin');
+    this.roundElements.forEach(el => this.leafletMap.removeLayer(el));
+    this.roundElements = [];
   }
 
   startGuessing() {
-    console.log("Start guessing state.");
+    console.log("UI State: PLACING_GUESS");
     this.setUIState('PLACING_GUESS');
     this.locationText.setAttribute('troika-text', 'value', 'Point on the map to place your guess');
-    this.map.flyTo({ zoom: 2, center: [0, 0], speed: 1.5 });
+    this.leafletMap.setView([20, 0], 2);
+    this.updateMapTexture();
   }
   
   handleControllerMapClick(uv) {
-    const mapCanvas = this.map.getCanvas();
-    const point = [uv.x * mapCanvas.width, uv.y * mapCanvas.height];
-    const latlng = this.map.unproject(point);
-    
-    if (this.guessMarker) {
-        this.guessMarker.setLngLat(latlng);
+    const mapSize = this.leafletMap.getSize();
+    const point = L.point(uv.x * mapSize.x, (1 - uv.y) * mapSize.y);
+    const latlng = this.leafletMap.containerPointToLatLng(point);
+
+    if (this.roundElements.length > 0) {
+        this.roundElements[0].setLatLng(latlng);
     } else {
-        this.guessMarker = new maplibregl.Marker({color: "#007cff"}).setLngLat(latlng).addTo(this.map);
+        const guessMarker = L.marker(latlng).addTo(this.leafletMap);
+        this.roundElements.push(guessMarker);
     }
     
     this.currentGuess = latlng;
     this.locationText.setAttribute('troika-text', 'value', 'Pin placed! Click CONFIRM GUESS');
-    
-    const mapDimensions = this.mapPanel.getAttribute('geometry');
-    this.mapPin.setAttribute('position', `${(uv.x - 0.5) * mapDimensions.width} ${(uv.y - 0.5) * mapDimensions.height} 0`);
+    this.mapPin.setAttribute('position', `${(uv.x - 0.5) * 2} ${(uv.y - 0.5) * 1.25} 0`);
     this.mapPin.setAttribute('visible', 'true');
+    this.updateMapTexture();
   }
 
   submitGuess() {
     if (!this.currentGuess) { this.locationText.setAttribute('troika-text', 'value', 'Please place a pin on the map first'); return; }
+    console.log("Guess submitted.");
     this.endRound(true, this.currentGuess);
   }
 
@@ -375,34 +353,36 @@ class VRGeoGuessr {
     this.mapPin.setAttribute('visible', 'false');
 
     const location = this.currentLocation;
-    const actualLoc = [parseFloat(location.longitude), parseFloat(location.latitude)];
+    const actualLoc = L.latLng(parseFloat(location.latitude), parseFloat(location.longitude));
     let roundScore = 0, distance = 0;
     
     if (guessed) {
-      distance = this.guessMarker.getLngLat().distanceTo(actualLoc);
+      distance = this.leafletMap.distance(guessLatLng, actualLoc);
       roundScore = this.calculateScore(distance);
       this.score += roundScore;
       this.scoreText.setAttribute('troika-text', 'value', `SCORE: ${this.score}`);
     }
     
-    this.map.addSource('correct-pin', { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: actualLoc } }] } });
-    this.map.addLayer({ id: 'correct-pin', type: 'symbol', source: 'correct-pin', layout: { 'icon-image': 'marker', 'icon-size': 1.5, 'icon-allow-overlap': true }, paint: {'icon-color': '#ff0000'} });
+    const correctPin = L.marker(actualLoc, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(this.leafletMap);
+    this.roundElements.push(correctPin);
 
     if (guessed) {
-        const lineData = { type: 'Feature', geometry: { type: 'LineString', coordinates: [this.guessMarker.getLngLat().toArray(), actualLoc] }};
-        this.map.addSource('answer-line', { type: 'geojson', data: lineData });
-        this.map.addLayer({ id: 'answer-line', type: 'line', source: 'answer-line', paint: { 'line-color': '#007cff', 'line-width': 4 } });
-        const bounds = new maplibregl.LngLatBounds(this.guessMarker.getLngLat(), actualLoc);
-        this.map.fitBounds(bounds, { padding: 80 });
+        const line = L.polyline([guessLatLng, actualLoc], {color: 'blue'}).addTo(this.leafletMap);
+        this.roundElements.push(line);
+        this.leafletMap.fitBounds(line.getBounds().pad(0.2));
     } else {
-        this.map.flyTo({ center: actualLoc, zoom: 5 });
+        this.leafletMap.setView(actualLoc, 5);
     }
     
     const resultsValue = `ROUND ${this.round}/${this.totalRounds}\n` + (guessed ? `DISTANCE: ${(distance/1000).toFixed(1)} km\nPOINTS: ${roundScore}` : 'TIME EXPIRED!') + `\n\nTOTAL SCORE: ${this.score}`;
     this.resultsText.setAttribute('troika-text', 'value', resultsValue);
     
-    this.setUIState('SHOWING_RESULTS');
-    setTimeout(() => { this.acceptingInput = true; }, 500);
+    this.setUIState(this.round < this.totalRounds ? 'SHOWING_RESULTS' : 'GAME_OVER');
+    this.updateMapTexture(); 
+    
+    if (this.round < this.totalRounds) {
+        setTimeout(() => { this.acceptingInput = true; }, 500);
+    }
   }
 }
 
