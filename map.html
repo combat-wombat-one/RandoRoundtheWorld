@@ -33,23 +33,31 @@
                 break;
 
             case 'placeGuessPin':
+                const guessLatLng = L.latLng(data.latlng.lat, data.latlng.lng);
                 if (roundElements.length > 0 && roundElements[0] instanceof L.Marker) {
-                    roundElements[0].setLatLng(data.latlng);
+                    roundElements[0].setLatLng(guessLatLng);
                 } else {
-                    const guessMarker = L.marker(data.latlng).addTo(map);
-                    roundElements.unshift(guessMarker); // Keep guess marker at the start
+                    const guessMarker = L.marker(guessLatLng).addTo(map);
+                    roundElements.unshift(guessMarker);
                 }
                 break;
 
             case 'showResults':
                 const { guessLatLng, actualLoc } = data;
-                const correctPin = L.marker(actualLoc, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(map);
-                const line = L.polyline([guessLatLng, actualLoc], {color: 'blue'}).addTo(map);
+                const guessPoint = L.latLng(guessLatLng.lat, guessLatLng.lng);
+                const actualPoint = L.latLng(actualLoc[0], actualLoc[1]);
+
+                const correctPin = L.marker(actualPoint, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(map);
+                const line = L.polyline([guessPoint, actualPoint], {color: 'blue'}).addTo(map);
                 
                 roundElements.push(correctPin);
                 roundElements.push(line);
                 
                 map.fitBounds(line.getBounds().pad(0.2));
+
+                // *** FIX: Calculate distance and send it back to the main game ***
+                const distance = map.distance(guessPoint, actualPoint);
+                parent.postMessage({ command: 'distanceCalculated', data: { distance: distance } }, '*');
                 break;
         }
     });
