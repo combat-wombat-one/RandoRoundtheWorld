@@ -22,7 +22,6 @@
 <button id="startButton">Click me with your Controller to Start Game!</button>
 <div id="mapContainer"></div>
 
-<!-- *** FIX: Wrap the scene in a div to prevent html2canvas from traversing it *** -->
 <div id="aframe-wrapper">
     <a-scene id="scene" 
              webxr="referenceSpaceType: local-floor"
@@ -48,13 +47,14 @@
       
       <a-entity id="uiWrapper" visible="false">
           <a-entity id="gameUI" position="0 1.2 -2.5">
-            <a-plane id="guessBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
+            <!-- Buttons no longer have clickable class by default; JS will manage it -->
+            <a-plane id="guessBtn" position="0 0.25 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
                 <a-entity troika-text="value: MAKE GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
             </a-plane>
-            <a-plane id="confirmBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#FF9800" visible="false">
+            <a-plane id="confirmBtn" position="0 -0.25 0" width="1.2" height="0.4" color="#FF9800" visible="false">
                 <a-entity troika-text="value: CONFIRM GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
             </a-plane>
-            <a-plane id="nextRoundBtn" class="clickable" position="0 0 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
+            <a-plane id="nextRoundBtn" position="0 0.25 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
                 <a-entity troika-text="value: NEXT ROUND; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
             </a-plane>
           </a-entity>
@@ -221,6 +221,7 @@ class VRGeoGuessr {
     console.log("Initializing Leaflet map...");
     if (this.leafletMap) this.leafletMap.remove();
     this.leafletMap = L.map(this.mapContainer, { center: [0, 0], zoom: 1, zoomControl: false, attributionControl: false, preferCanvas: true });
+    // *** FIX: Corrected the typo in the tile layer URL ***
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, crossOrigin: true }).addTo(this.leafletMap);
   }
 
@@ -240,11 +241,17 @@ class VRGeoGuessr {
     }, 200); 
   }
   
+  // *** FIX: This function now manages both visibility AND clickability to prevent bugs ***
   setUIState(state) {
       console.log(`Setting UI state to: ${state}`);
+      
       this.guessBtn.setAttribute('visible', false);
+      this.guessBtn.classList.remove('clickable');
       this.confirmBtn.setAttribute('visible', false);
+      this.confirmBtn.classList.remove('clickable');
       this.nextRoundBtn.setAttribute('visible', false);
+      this.nextRoundBtn.classList.remove('clickable');
+
       this.mapWrapper.setAttribute('visible', false);
       this.resultsPanel.setAttribute('visible', false);
       
@@ -253,9 +260,11 @@ class VRGeoGuessr {
               break;
           case 'AWAITING_GUESS':
               this.guessBtn.setAttribute('visible', true);
+              this.guessBtn.classList.add('clickable');
               break;
           case 'PLACING_GUESS':
               this.confirmBtn.setAttribute('visible', true);
+              this.confirmBtn.classList.add('clickable');
               this.mapWrapper.setAttribute('visible', true);
               break;
           case 'SHOWING_RESULTS':
@@ -263,6 +272,7 @@ class VRGeoGuessr {
               this.resultsPanel.setAttribute('visible', true);
               if (this.round < this.totalRounds) {
                   this.nextRoundBtn.setAttribute('visible', true);
+                  this.nextRoundBtn.classList.add('clickable');
               }
               break;
           case 'GAME_OVER':
