@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <title>Map Iframe</title>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
@@ -13,56 +14,79 @@
 <body>
 <div id="map"></div>
 <script>
-    const map = L.map('map', { center: [0, 0], zoom: 1, zoomControl: false, attributionControl: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+    window.onload = function() {
+        // *** FIX: Set the iframe body size to the correct 2:1 aspect ratio ***
+        document.body.style.width = '1024px';
+        document.body.style.height = '640px';
 
-    let roundElements = [];
+        const map = L.map('map', { center: [0, 0], zoom: 1, zoomControl: false, attributionControl: false });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, noWrap: true, bounds: [[-90, -180], [90, 180]] }).addTo(map);
 
-    window.addEventListener('message', (event) => {
-        const { command, data } = event.data;
+        let roundElements = [];
 
-        switch (command) {
-            case 'cleanup':
-                roundElements.forEach(el => map.removeLayer(el));
-                roundElements = [];
-                break;
-            
-            case 'setView':
-                map.setView(data.center, data.zoom);
-                break;
-
-            // *** FIX: Added curly braces to create a new block scope ***
-            case 'placeGuessPin': {
-                const guessLatLng = L.latLng(data.latlng.lat, data.latlng.lng);
-                if (roundElements.length > 0 && roundElements[0] instanceof L.Marker) {
-                    roundElements[0].setLatLng(guessLatLng);
-                } else {
-                    const guessMarker = L.marker(guessLatLng).addTo(map);
-                    roundElements.unshift(guessMarker);
-                }
-                break;
-            }
-
-            // *** FIX: Added curly braces to create a new block scope ***
-            case 'showResults': {
-                const { guessLatLng, actualLoc } = data;
-                const guessPoint = L.latLng(guessLatLng.lat, guessLatLng.lng);
-                const actualPoint = L.latLng(actualLoc[0], actualLoc[1]);
-
-                const correctPin = L.marker(actualPoint, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(map);
-                const line = L.polyline([guessPoint, actualPoint], {color: 'blue'}).addTo(map);
-                
-                roundElements.push(correctPin);
-                roundElements.push(line);
-                
-                map.fitBounds(line.getBounds().pad(0.2));
-
-                const distance = map.distance(guessPoint, actualPoint);
-                parent.postMessage({ command: 'distanceCalculated', data: { distance: distance } }, '*');
-                break;
-            }
+        function updateAndSendTexture() {
+            setTimeout(() => {
+                html2canvas(document.body, { useCORS: true, logging: false, scale: 0.75 }).then(canvas => {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    parent.postMessage({ command: 'mapTextureUpdated', data: { dataUrl: dataUrl } }, '*');
+                });
+            }, 150);
         }
-    });
+
+        map.on('moveend zoomend viewreset', updateAndSendTexture);
+        
+        // This is a crucial safety net. It tells the map to resize itself
+        // correctly after it has been created and placed in the DOM.
+        setTimeout(() => map.invalidateSize(), 100);
+
+        window.addEventListener('message', (event) => {
+            const { command, data } = event.data;
+
+            switch (command) {
+                case 'cleanup':
+                    roundElements.forEach(el => map.removeLayer(el));
+                    roundElements = [];
+                    map.setView([20, 0], 1);
+                    break;
+                
+                case 'setView':
+                    map.invalidateSize();
+                    map.setView(data.center, data.zoom);
+                    break;
+
+                case 'placeGuessPin': {
+                    const latlng = L.latLng(data.latlng.lat, data.latlng.lng);
+                    if (roundElements.length > 0 && roundElements[0] instanceof L.Marker) {
+                        roundElements[0].setLatLng(latlng);
+                    } else {
+                        const guessMarker = L.marker(latlng).addTo(map);
+                        roundElements.unshift(guessMarker);
+                    }
+                    updateAndSendTexture();
+                    break;
+                }
+
+                case 'showResults': {
+                    const { guessLatLng, actualLoc } = data;
+                    const guessPoint = L.latLng(guessLatLng.lat, guessLatLng.lng);
+                    const actualPoint = L.latLng(actualLoc[0], actualLoc[1]);
+
+                    const correctPin = L.marker(actualPoint, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(map);
+                    const line = L.polyline([guessPoint, actualPoint], {color: 'blue'}).addTo(map);
+                    
+                    roundElements.push(correctPin);
+                    roundElements.push(line);
+                    
+                    map.invalidateSize();
+                    map.fitBounds(line.getBounds().pad(0.2));
+
+                    const distance = map.distance(guessPoint, actualPoint);
+                    parent.postMessage({ command: 'distanceCalculated', data: { distance: distance } }, '*');
+                    break;
+                }
+            }
+        });
+    }
 </script>
 </body>
 </html>
