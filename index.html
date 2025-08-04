@@ -16,7 +16,6 @@
 <body class="splash-background">
 
 <button id="startButton">Click me with your Controller to Start Game!</button>
-<!-- *** FIX: Set iframe to a correct 2:1 aspect ratio for the debug view and final rendering *** -->
 <iframe id="map-iframe" src="map.html" style="position: fixed; top: -10000px; left: -10000px; width: 1024px; height: 512px; border: none;"></iframe>
 
 <div id="aframe-wrapper">
@@ -60,7 +59,6 @@
           </a-entity>
 
           <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
-            <!-- *** FIX: Changed height to 1.0 to create a perfect 2:1 aspect ratio *** -->
             <a-plane id="mapPanel" class="clickable" width="2" height="1" material="shader: flat; color: #FFF; side: double; transparent: true;">
               <a-entity id="locationText" position="0 -0.55 0.01" troika-text="value:; align: center; color: black; fontSize: 0.06; outlineWidth: 0.005; outlineColor: #FFF; font: Orbitron.ttf;" ></a-entity>
             </a-plane>
@@ -303,21 +301,29 @@ class VRGeoGuessr {
     this.postMapCommand('setView', { center: [20, 0], zoom: 1 });
   }
 
-  // *** FIX: Re-implemented the reliable guess calculation logic ***
+  // *** FIX: Implemented the correct inverse Mercator projection formula ***
   handleControllerMapClick(uv) {
-    // The UV coordinates (0,0) are at the bottom-left of the plane.
-    // We flip the Y-axis because map latitude goes from ~85 (top) to ~-85 (bottom).
-    const lat = (1 - uv.y) * 170.1022 - 85.0511;
-    const lng = uv.x * 360 - 180;
+    if (uv.x < 0.25 || uv.x > 0.75) {
+        return;
+    }
+
+    const mapUvX = (uv.x - 0.25) / 0.5;
+    const mapUvY = uv.y;
+
+    // Convert longitude directly (linear)
+    const lng = (mapUvX * 360 - 180);
+
+    // Convert latitude using the inverse Mercator projection formula (non-linear)
+    const n = Math.PI - 2 * Math.PI * mapUvY;
+    const lat = -((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
 
     this.currentGuess = { lat, lng };
     this.postMapCommand('placeGuessPin', { latlng: this.currentGuess });
     this.locationText.setAttribute('troika-text', 'value', 'Pin placed! Click CONFIRM GUESS');
 
+    // Place the visual pin on the A-Frame plane using the original, unmapped UV.
     const planeWidth = this.mapPanel.getAttribute('width');
     const planeHeight = this.mapPanel.getAttribute('height');
-
-    // Convert UV to local coordinates of the plane
     const x = (uv.x - 0.5) * planeWidth;
     const y = (uv.y - 0.5) * planeHeight;
 
@@ -325,7 +331,6 @@ class VRGeoGuessr {
     this.mapPin.setAttribute('visible', 'true');
   }
 
-  // *** FIX: Simplified submit logic, no longer needs to wait for a message ***
   submitGuess() {
     if (this.currentGuess) {
         this.endRound(true);
