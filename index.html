@@ -47,7 +47,7 @@
       </a-entity>
       
       <a-entity id="uiWrapper" visible="false">
-          <a-entity id="gameUI" position="0 1.2 -2.4">
+          <a-entity id="gameUI" position="0 1.2 -2.6">
             <a-plane id="guessBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
                 <a-entity troika-text="value: MAKE GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
             </a-plane>
@@ -61,7 +61,7 @@
           
           <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
             <!-- *** FIX: Changed height to 1.0 to create a perfect 2:1 aspect ratio *** -->
-            <a-plane id="mapPanel" class="clickable" width="2" height="1.25" material="shader: flat; color: #FFF; side: double; transparent: true;">
+            <a-plane id="mapPanel" class="clickable" width="2" height="1" material="shader: flat; color: #FFF; side: double; transparent: true;">
               <a-entity id="locationText" position="0 -0.55 0.01" troika-text="value:; align: center; color: black; fontSize: 0.06; outlineWidth: 0.005; outlineColor: #FFF; font: Orbitron.ttf;" ></a-entity>
             </a-plane>
             <a-entity id="mapPin" visible="false">
@@ -305,13 +305,23 @@ class VRGeoGuessr {
   
   // *** FIX: Re-implemented the reliable guess calculation logic ***
   handleControllerMapClick(uv) {
+    // The UV coordinates (0,0) are at the bottom-left of the plane.
+    // We flip the Y-axis because map latitude goes from ~85 (top) to ~-85 (bottom).
     const lat = (1 - uv.y) * 170.1022 - 85.0511;
     const lng = uv.x * 360 - 180;
+
     this.currentGuess = { lat, lng };
     this.postMapCommand('placeGuessPin', { latlng: this.currentGuess });
     this.locationText.setAttribute('troika-text', 'value', 'Pin placed! Click CONFIRM GUESS');
+
+    const planeWidth = this.mapPanel.getAttribute('width');
     const planeHeight = this.mapPanel.getAttribute('height');
-    this.mapPin.setAttribute('position', `${(uv.x - 0.5) * 2} ${(uv.y - 0.5) * planeHeight} 0`);
+    
+    // Convert UV to local coordinates of the plane
+    const x = (uv.x - 0.5) * planeWidth;
+    const y = (uv.y - 0.5) * planeHeight;
+
+    this.mapPin.setAttribute('position', `${x} ${y} 0.01`);
     this.mapPin.setAttribute('visible', 'true');
   }
 
