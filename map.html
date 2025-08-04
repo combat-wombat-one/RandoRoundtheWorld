@@ -17,7 +17,7 @@
     window.onload = function() {
         // *** FIX: Set the iframe body size to the correct 2:1 aspect ratio ***
         document.body.style.width = '1024px';
-        document.body.style.height = '640px';
+        document.body.style.height = '512px';
 
         const map = L.map('map', { center: [0, 0], zoom: 1, zoomControl: false, attributionControl: false });
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, noWrap: true, bounds: [[-90, -180], [90, 180]] }).addTo(map);
@@ -26,7 +26,7 @@
 
         function updateAndSendTexture() {
             setTimeout(() => {
-                html2canvas(document.body, { useCORS: true, logging: false, scale: 0.75 }).then(canvas => {
+                html2canvas(document.body, { useCORS: true, logging: false, scale: 1 }).then(canvas => {
                     const dataUrl = canvas.toDataURL('image/png');
                     parent.postMessage({ command: 'mapTextureUpdated', data: { dataUrl: dataUrl } }, '*');
                 });
