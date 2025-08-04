@@ -7,18 +7,30 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-        #map { width: 100%; height: 100%; background: white; }
+        /* Make the body our 2:1 container */
+        body, html {
+            margin: 0; padding: 0;
+            width: 1024px; height: 512px;
+            overflow: hidden;
+            background-color: #f0f0f0; /* A neutral background for the padded area */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* The map itself will be a square that fits inside the container */
+        #map {
+            width: 512px;
+            height: 512px;
+        }
     </style>
 </head>
 <body>
+
+<!-- The map div is now a 1:1 square, centered in the 2:1 body -->
 <div id="map"></div>
+
 <script>
     window.onload = function() {
-        // *** FIX: Set the iframe body size to the correct 2:1 aspect ratio ***
-        document.body.style.width = '1024px';
-        document.body.style.height = '512px';
-
         const map = L.map('map', { center: [0, 0], zoom: 1, zoomControl: false, attributionControl: false });
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, noWrap: true, bounds: [[-90, -180], [90, 180]] }).addTo(map);
 
@@ -26,6 +38,7 @@
 
         function updateAndSendTexture() {
             setTimeout(() => {
+                // Capture the entire body, which is 2:1 and includes our centered map
                 html2canvas(document.body, { useCORS: true, logging: false, scale: 1 }).then(canvas => {
                     const dataUrl = canvas.toDataURL('image/png');
                     parent.postMessage({ command: 'mapTextureUpdated', data: { dataUrl: dataUrl } }, '*');
@@ -34,26 +47,20 @@
         }
 
         map.on('moveend zoomend viewreset', updateAndSendTexture);
-
-        // This is a crucial safety net. It tells the map to resize itself
-        // correctly after it has been created and placed in the DOM.
         setTimeout(() => map.invalidateSize(), 100);
 
         window.addEventListener('message', (event) => {
             const { command, data } = event.data;
-
             switch (command) {
                 case 'cleanup':
                     roundElements.forEach(el => map.removeLayer(el));
                     roundElements = [];
-                    map.setView([20, 0], 1);
+                    map.setView([20, 0], 1); // Keep the default view
                     break;
-
                 case 'setView':
                     map.invalidateSize();
                     map.setView(data.center, data.zoom);
                     break;
-
                 case 'placeGuessPin': {
                     const latlng = L.latLng(data.latlng.lat, data.latlng.lng);
                     if (roundElements.length > 0 && roundElements[0] instanceof L.Marker) {
@@ -65,21 +72,16 @@
                     updateAndSendTexture();
                     break;
                 }
-
                 case 'showResults': {
                     const { guessLatLng, actualLoc } = data;
                     const guessPoint = L.latLng(guessLatLng.lat, guessLatLng.lng);
                     const actualPoint = L.latLng(actualLoc[0], actualLoc[1]);
-
                     const correctPin = L.marker(actualPoint, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(map);
                     const line = L.polyline([guessPoint, actualPoint], {color: 'blue'}).addTo(map);
-
                     roundElements.push(correctPin);
                     roundElements.push(line);
-
                     map.invalidateSize();
                     map.fitBounds(line.getBounds().pad(0.2));
-
                     const distance = map.distance(guessPoint, actualPoint);
                     parent.postMessage({ command: 'distanceCalculated', data: { distance: distance } }, '*');
                     break;
