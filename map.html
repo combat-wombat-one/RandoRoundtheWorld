@@ -34,7 +34,7 @@
         }
 
         map.on('moveend zoomend viewreset', updateAndSendTexture);
-        
+
         // This is a crucial safety net. It tells the map to resize itself
         // correctly after it has been created and placed in the DOM.
         setTimeout(() => map.invalidateSize(), 100);
@@ -48,7 +48,7 @@
                     roundElements = [];
                     map.setView([20, 0], 1);
                     break;
-                
+
                 case 'setView':
                     map.invalidateSize();
                     map.setView(data.center, data.zoom);
@@ -73,10 +73,10 @@
 
                     const correctPin = L.marker(actualPoint, { icon: L.divIcon({className: 'correct-pin', html: '📍', iconSize:[24,24], iconAnchor:[12,24]}) }).addTo(map);
                     const line = L.polyline([guessPoint, actualPoint], {color: 'blue'}).addTo(map);
-                    
+
                     roundElements.push(correctPin);
                     roundElements.push(line);
-                    
+
                     map.invalidateSize();
                     map.fitBounds(line.getBounds().pad(0.2));
 
