@@ -20,18 +20,18 @@
 <iframe id="map-iframe" src="map.html" style="position: fixed; top: -10000px; left: -10000px; width: 1024px; height: 512px; border: none;"></iframe>
 
 <div id="aframe-wrapper">
-    <a-scene id="scene" 
+    <a-scene id="scene"
              webxr="referenceSpaceType: local-floor"
              vr-mode-ui="enabled: true"
              renderer="antialias: true; logarithmicDepthBuffer: true"
              visible="false">
-             
+
       <a-assets id="assets-container">
         <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
       </a-assets>
-      
+
       <a-sky id="sky" material="shader: flat; color: #FFFFFF"></a-sky>
-      
+
       <a-entity id="cameraRig" position="0 1.6 0">
         <a-camera id="camera" wasd-controls-enabled="false">
           <a-entity id="vrLoadingUI" visible="false" position="0 0 -1.5">
@@ -45,7 +45,7 @@
         </a-camera>
         <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .clickable; far: 20;"></a-entity>
       </a-entity>
-      
+
       <a-entity id="uiWrapper" visible="false">
           <a-entity id="gameUI" position="0 1.2 -2.6">
             <a-plane id="guessBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
@@ -58,7 +58,7 @@
                 <a-entity troika-text="value: NEXT ROUND; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
             </a-plane>
           </a-entity>
-          
+
           <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
             <!-- *** FIX: Changed height to 1.0 to create a perfect 2:1 aspect ratio *** -->
             <a-plane id="mapPanel" class="clickable" width="2" height="1" material="shader: flat; color: #FFF; side: double; transparent: true;">
@@ -68,12 +68,12 @@
                 <a-cone color="red" radius-bottom="0.03" radius-top="0" height="0.1" position="0 0.05 0.01" rotation="-90 0 0"></a-cone>
             </a-entity>
           </a-entity>
-          
+
           <a-entity id="scoreAndTimer" position="0 2.8 -2.5">
             <a-entity id="scoreText" position="0 0 0" troika-text="value: SCORE: 0; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
             <a-entity id="timerText" position="0.9 0 0" troika-text="value: 02:00; align: right; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
           </a-entity>
-          
+
           <a-entity id="resultsPanel" position="0 1.9 -2.5" visible="false">
             <a-plane width="2.2" height="1.2" color="#333333" opacity="0.9">
               <a-entity id="resultsText" position="0 0 0.01" troika-text="value:; align: center; color: white; fontSize: 0.07; whiteSpace: normal; maxWidth: 2; font: Orbitron.ttf;"></a-entity>
@@ -149,7 +149,7 @@ class VRGeoGuessr {
     this.scene.enterVR().then(() => this.loadAndStartGame())
       .catch(err => { console.error("Could not enter VR mode:", err); this.loadAndStartGame(); });
   }
-  
+
   waitForMapReady() {
       return new Promise(resolve => {
           if (this.mapIframe.contentWindow && this.mapIframe.contentWindow.document.readyState === 'complete') {
@@ -159,7 +159,7 @@ class VRGeoGuessr {
           }
       });
   }
-  
+
   async loadAndStartGame() {
     try {
         const controllerPromise = new Promise(resolve => this.scene.addEventListener('controllerconnected', resolve, { once: true }));
@@ -205,12 +205,12 @@ class VRGeoGuessr {
       });
     });
   }
-  
+
   generateGamePlaylist() {
       const shuffledData = [...this.data].sort(() => 0.5 - Math.random());
       this.gamePlaylist = shuffledData.slice(0, this.totalRounds);
   }
-  
+
   preloadPlaylistImages() {
       this.progressBar.setAttribute('visible', 'true');
       let loadedCount = 0;
@@ -260,14 +260,14 @@ class VRGeoGuessr {
     };
     image.src = dataUrl;
   }
-  
+
   setUIState(state) {
       this.guessBtn.setAttribute('visible', false); this.guessBtn.classList.remove('clickable');
       this.confirmBtn.setAttribute('visible', false); this.confirmBtn.classList.remove('clickable');
       this.nextRoundBtn.setAttribute('visible', false); this.nextRoundBtn.classList.remove('clickable');
       this.mapWrapper.setAttribute('visible', false);
       this.resultsPanel.setAttribute('visible', false);
-      
+
       switch(state) {
           case 'AWAITING_GUESS': this.guessBtn.setAttribute('visible', true); this.guessBtn.classList.add('clickable'); break;
           case 'PLACING_GUESS': this.confirmBtn.setAttribute('visible', true); this.confirmBtn.classList.add('clickable'); this.mapWrapper.setAttribute('visible', true); break;
@@ -296,13 +296,13 @@ class VRGeoGuessr {
     this.resetTimer(); this.startTimer();
     setTimeout(() => { this.acceptingInput = true; }, 500);
   }
-  
+
   startGuessing() {
     this.setUIState('PLACING_GUESS');
     this.locationText.setAttribute('troika-text', 'value', 'Point on the map to place your guess');
     this.postMapCommand('setView', { center: [20, 0], zoom: 1 });
   }
-  
+
   // *** FIX: Re-implemented the reliable guess calculation logic ***
   handleControllerMapClick(uv) {
     // The UV coordinates (0,0) are at the bottom-left of the plane.
@@ -316,7 +316,7 @@ class VRGeoGuessr {
 
     const planeWidth = this.mapPanel.getAttribute('width');
     const planeHeight = this.mapPanel.getAttribute('height');
-    
+
     // Convert UV to local coordinates of the plane
     const x = (uv.x - 0.5) * planeWidth;
     const y = (uv.y - 0.5) * planeHeight;
@@ -333,7 +333,7 @@ class VRGeoGuessr {
         this.locationText.setAttribute('troika-text', 'value', 'Please place a pin on the map first!');
     }
   }
-  
+
   endRound(guessed) {
     this.acceptingInput = false; clearInterval(this.timer);
     this.mapPin.setAttribute('visible', 'false');
@@ -347,7 +347,7 @@ class VRGeoGuessr {
   }
 
   calculateScore(distance) { return Math.round(5000 * Math.exp(-0.000002 * distance)); }
-  
+
   processRoundResults(distance, wasGuessed = true) {
       let roundScore = 0;
       if(wasGuessed) {
