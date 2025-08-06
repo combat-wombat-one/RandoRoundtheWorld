@@ -2,86 +2,120 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>VR GeoGuessr - Enhanced Map Version</title>
+  <title>VR GeoGuessr - Complete Fixed Version</title>
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://unpkg.com/aframe-troika-text/dist/aframe-troika-text.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap" rel="stylesheet">
-<style>
-  body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
-  .splash-background { background: url('Splashscreen.png') no-repeat center center fixed; background-size: cover; }
-  #startButton { font-family: 'Orbitron', sans-serif; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; font-size: 30px; background: #e0202d; color: #fff; border: none; border-radius: 5px; cursor: pointer; z-index: 999; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-</style>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+    .splash-background { background: url('Splashscreen.png') no-repeat center center fixed; background-size: cover; }
+    #startButton { 
+      font-family: 'Orbitron', sans-serif; 
+      position: absolute; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      padding: 20px 40px; 
+      font-size: 30px; 
+      background: #e0202d; 
+      color: #fff; 
+      border: none; 
+      border-radius: 5px; 
+      cursor: pointer; 
+      z-index: 999; 
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+    }
+    #errorMessage { 
+      position: absolute; 
+      top: 60%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      color: red; 
+      background: white; 
+      padding: 20px; 
+      border-radius: 5px; 
+      display: none; 
+      z-index: 1000; 
+      max-width: 80%;
+      text-align: center;
+    }
+    #retryButton {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: #e0202d;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body class="splash-background">
 
-<button id="startButton">Click me with your Controller to Start the Game!</button>
+<button id="startButton">START VR GEOGUESSR</button>
+<div id="errorMessage"></div>
 <iframe id="map-iframe" src="map.html" style="position: fixed; top: -10000px; left: -10000px; width: 2048px; height: 1024px; border: none;"></iframe>
 
 <div id="aframe-wrapper">
-    <a-scene id="scene"
-             webxr="referenceSpaceType: local-floor"
-             vr-mode-ui="enabled: true"
-             renderer="antialias: true; logarithmicDepthBuffer: true"
-             visible="false">
+  <a-scene id="scene" webxr="referenceSpaceType: local-floor" vr-mode-ui="enabled: true" renderer="antialias: true; logarithmicDepthBuffer: true" visible="false">
+    <a-assets id="assets-container">
+      <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
+    </a-assets>
 
-      <a-assets id="assets-container">
-        <img id="fallback" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z/C/HgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==" crossorigin="anonymous">
-      </a-assets>
+    <a-sky id="sky" material="shader: flat; color: #FFFFFF"></a-sky>
 
-      <a-sky id="sky" material="shader: flat; color: #FFFFFF"></a-sky>
-
-      <a-entity id="cameraRig" position="0 1.6 0">
-        <a-camera id="camera" wasd-controls-enabled="false">
-          <a-entity id="vrLoadingUI" visible="false" position="0 0 -1.5">
-              <a-entity id="funFactText" troika-text="value: Loading...; align: center; color: black; fontSize: 0.08; outlineWidth: 0.02; outlineColor: white; whiteSpace: normal; maxWidth: 1.5;"></a-entity>
-              <a-entity id="progressBar" position="0 -0.2 0" visible="false">
-                <a-plane id="progressBarBg" width="1" height="0.05" color="#555555"></a-plane>
-                <a-plane id="progressBarFill" width="0" height="0.05" color="#4CAF50" position="-0.5 0 0.001"></a-plane>
-                <a-entity id="progressText" position="0 -0.08 0" troika-text="value: (0/5); align: center; color: black; fontSize: 0.06; outlineWidth: 0.02; outlineColor: white;"></a-entity>
-              </a-entity>
+    <a-entity id="cameraRig" position="0 1.6 0">
+      <a-camera id="camera" wasd-controls-enabled="false">
+        <a-entity id="vrLoadingUI" visible="false" position="0 0 -1.5">
+          <a-entity id="funFactText" troika-text="value: Loading...; align: center; color: black; fontSize: 0.08; outlineWidth: 0.02; outlineColor: white; whiteSpace: normal; maxWidth: 1.5;"></a-entity>
+          <a-entity id="progressBar" position="0 -0.2 0" visible="false">
+            <a-plane id="progressBarBg" width="1" height="0.05" color="#555555"></a-plane>
+            <a-plane id="progressBarFill" width="0" height="0.05" color="#4CAF50" position="-0.5 0 0.001"></a-plane>
+            <a-entity id="progressText" position="0 -0.08 0" troika-text="value: (0/5); align: center; color: black; fontSize: 0.06; outlineWidth: 0.02; outlineColor: white;"></a-entity>
           </a-entity>
-        </a-camera>
-        <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .clickable; far: 20;"></a-entity>
+        </a-entity>
+      </a-camera>
+      <a-entity id="rightController" oculus-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .clickable; far: 20;"></a-entity>
+    </a-entity>
+
+    <a-entity id="uiWrapper" visible="false">
+      <a-entity id="gameUI" position="0 1.2 -2.6">
+        <a-plane id="guessBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
+          <a-entity troika-text="value: MAKE GUESS; align: center; color: white; fontSize: 0.1;" position="0 0 0.01"></a-entity>
+        </a-plane>
+        <a-plane id="confirmBtn" class="clickable" position="0 -0.25 0" width="1.2" height="0.4" color="#FF9800" visible="false">
+          <a-entity troika-text="value: CONFIRM GUESS; align: center; color: white; fontSize: 0.1;" position="0 0 0.01"></a-entity>
+        </a-plane>
+        <a-plane id="nextRoundBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
+          <a-entity troika-text="value: NEXT ROUND; align: center; color: white; fontSize: 0.1;" position="0 0 0.01"></a-entity>
+        </a-plane>
       </a-entity>
 
-      <a-entity id="uiWrapper" visible="false">
-          <a-entity id="gameUI" position="0 1.2 -2.6">
-            <a-plane id="guessBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#9C27B0" visible="false">
-                <a-entity troika-text="value: MAKE GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
-            </a-plane>
-            <a-plane id="confirmBtn" class="clickable" position="0 -0.25 0" width="1.2" height="0.4" color="#FF9800" visible="false">
-                <a-entity troika-text="value: CONFIRM GUESS; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
-            </a-plane>
-            <a-plane id="nextRoundBtn" class="clickable" position="0 0.25 0" width="1.2" height="0.4" color="#4CAF50" visible="false">
-                <a-entity troika-text="value: NEXT ROUND; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;" position="0 0 0.01"></a-entity>
-            </a-plane>
-          </a-entity>
-
-          <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
-            <a-entity id="mapContainer">
-              <a-plane id="mapPanel" class="clickable" width="4" height="2" material="shader: flat; side: double;">
-                <a-image id="mapImage" width="4" height="2" position="0 0 0.001"></a-image>
-              </a-plane>
-              <a-entity id="locationText" position="0 -1.1 0.01" troika-text="value:; align: center; color: black; fontSize: 0.08; outlineWidth: 0.005; outlineColor: #FFF; font: Orbitron.ttf;"></a-entity>
-            </a-entity>
-            <a-entity id="mapPin" visible="false">
-                <a-cone color="red" radius-bottom="0.03" radius-top="0" height="0.1" position="0 0.05 0.01" rotation="-90 0 0"></a-cone>
-            </a-entity>
-          </a-entity>
-
-          <a-entity id="scoreAndTimer" position="0 2.8 -2.5">
-            <a-entity id="scoreText" position="0 0 0" troika-text="value: SCORE: 0; align: center; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
-            <a-entity id="timerText" position="0.9 0 0" troika-text="value: 02:00; align: right; color: white; fontSize: 0.1; font: Orbitron.ttf;"></a-entity>
-          </a-entity>
-
-          <a-entity id="resultsPanel" position="0 1.9 -2.5" visible="false">
-            <a-plane width="2.2" height="1.2" color="#333333" opacity="0.9">
-              <a-entity id="resultsText" position="0 0 0.01" troika-text="value:; align: center; color: white; fontSize: 0.07; whiteSpace: normal; maxWidth: 2; font: Orbitron.ttf;"></a-entity>
-            </a-plane>
-          </a-entity>
+      <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
+        <a-entity id="mapContainer">
+          <a-plane id="mapPanel" class="clickable" width="4" height="2" material="shader: flat; side: double;">
+            <a-image id="mapImage" width="4" height="2" position="0 0 0.001"></a-image>
+          </a-plane>
+          <a-entity id="locationText" position="0 -1.1 0.01" troika-text="value:; align: center; color: black; fontSize: 0.08; outlineWidth: 0.005; outlineColor: #FFF;"></a-entity>
+        </a-entity>
+        <a-entity id="mapPin" visible="false">
+          <a-cone color="red" radius-bottom="0.03" radius-top="0" height="0.1" position="0 0.05 0.01" rotation="-90 0 0"></a-cone>
+        </a-entity>
       </a-entity>
-    </a-scene>
+
+      <a-entity id="scoreAndTimer" position="0 2.8 -2.5">
+        <a-entity id="scoreText" position="0 0 0" troika-text="value: SCORE: 0; align: center; color: white; fontSize: 0.1;"></a-entity>
+        <a-entity id="timerText" position="0.9 0 0" troika-text="value: 02:00; align: right; color: white; fontSize: 0.1;"></a-entity>
+      </a-entity>
+
+      <a-entity id="resultsPanel" position="0 1.9 -2.5" visible="false">
+        <a-plane width="2.2" height="1.2" color="#333333" opacity="0.9">
+          <a-entity id="resultsText" position="0 0 0.01" troika-text="value:; align: center; color: white; fontSize: 0.07; whiteSpace: normal; maxWidth: 2;"></a-entity>
+        </a-plane>
+      </a-entity>
+    </a-entity>
+  </a-scene>
 </div>
 
 <script>
@@ -110,17 +144,49 @@ class VRGeoGuessr {
     this.resultsPanel = document.getElementById('resultsPanel');
     this.resultsText = document.getElementById('resultsText');
     this.mapIframe = document.getElementById('map-iframe');
+    this.errorMessage = document.getElementById('errorMessage');
 
-    this.data = []; this.gamePlaylist = [];
-    this.funFacts = []; this.funFactInterval = null;
-    this.score = 0; this.round = 0; this.totalRounds = 5;
-    this.timer = null; this.timeLeft = 120;
-    this.currentGuess = null; this.acceptingInput = false;
+    this.data = []; 
+    this.gamePlaylist = [];
+    this.funFacts = []; 
+    this.funFactInterval = null;
+    this.score = 0; 
+    this.round = 0; 
+    this.totalRounds = 5;
+    this.timer = null; 
+    this.timeLeft = 120;
+    this.currentGuess = null; 
+    this.acceptingInput = false;
+    this.currentLocation = null;
+    this.loadTimeout = null;
 
     this.bindEvents();
   }
 
-  postMapCommand(command, data = {}) { if (this.mapIframe.contentWindow) this.mapIframe.contentWindow.postMessage({ command, data }, '*'); }
+  showError(message, showRetry = true) {
+    clearTimeout(this.loadTimeout);
+    this.errorMessage.innerHTML = message;
+    this.errorMessage.style.display = 'block';
+    this.startButton.style.display = 'none';
+    
+    if (showRetry) {
+      const retryButton = document.createElement('button');
+      retryButton.id = 'retryButton';
+      retryButton.textContent = 'RETRY';
+      retryButton.addEventListener('click', () => {
+        this.errorMessage.style.display = 'none';
+        this.initExperience();
+      });
+      this.errorMessage.appendChild(document.createElement('br'));
+      this.errorMessage.appendChild(retryButton);
+    }
+  }
+
+  postMapCommand(command, data = {}) { 
+    if (this.mapIframe.contentWindow) {
+      this.mapIframe.contentWindow.postMessage({ command, data }, '*');
+    }
+  }
 
   bindEvents() {
     this.startButton.addEventListener('click', () => this.initExperience());
@@ -128,53 +194,117 @@ class VRGeoGuessr {
     this.confirmBtn.addEventListener('click', () => { if (this.acceptingInput) this.submitGuess(); });
     this.nextRoundBtn.addEventListener('click', () => { if (this.acceptingInput) this.startNewRound(); });
     this.mapPanel.addEventListener('click', (event) => {
-        if (this.acceptingInput && this.mapWrapper.getAttribute('visible') && event.detail.intersection) {
-            this.handleControllerMapClick(event.detail.intersection.uv);
-        }
+      if (this.acceptingInput && this.mapWrapper.getAttribute('visible') && event.detail.intersection) {
+        this.handleControllerMapClick(event.detail.intersection.uv);
+      }
     });
 
     window.addEventListener('message', (event) => {
-        if (event.source !== this.mapIframe.contentWindow) return;
-        if (event.data.command === 'mapTextureUpdated') {
-            this.applyMapTexture(event.data.data.dataUrl);
-        } else if (event.data.command === 'distanceCalculated') {
-            this.processRoundResults(event.data.data.distance);
-        }
+      if (event.source !== this.mapIframe.contentWindow) return;
+      if (event.data.command === 'mapTextureUpdated') {
+        this.applyMapTexture(event.data.data.dataUrl);
+      } else if (event.data.command === 'distanceCalculated') {
+        this.processRoundResults(event.data.data.distance);
+      }
     });
   }
 
   initExperience() {
-    this.startButton.style.display = 'none';
-    document.body.classList.remove('splash-background');
-    this.scene.setAttribute('visible', 'true');
-    this.vrLoadingUI.setAttribute('visible', 'true');
-    this.scene.enterVR().then(() => this.loadAndStartGame())
-      .catch(err => { console.error("Could not enter VR mode:", err); this.loadAndStartGame(); });
+    try {
+      this.startButton.style.display = 'none';
+      this.errorMessage.style.display = 'none';
+      document.body.classList.remove('splash-background');
+      this.scene.setAttribute('visible', 'true');
+      this.vrLoadingUI.setAttribute('visible', 'true');
+      
+      // Set loading timeout
+      this.loadTimeout = setTimeout(() => {
+        this.showError("Loading is taking too long. Check your internet connection.");
+      }, 15000);
+
+      // First try entering VR, but fallback to non-VR if needed
+      this.scene.enterVR().then(() => {
+        clearTimeout(this.loadTimeout);
+        this.loadAndStartGame();
+      }).catch(err => {
+        console.log("VR not available, continuing in non-VR mode");
+        clearTimeout(this.loadTimeout);
+        this.loadAndStartGame();
+      });
+    } catch (error) {
+      this.showError("Failed to initialize: " + error.message);
+    }
+  }
+
+  async checkFileExists(url) {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   waitForMapReady() {
-      return new Promise(resolve => {
-          if (this.mapIframe.contentWindow && this.mapIframe.contentWindow.document.readyState === 'complete') {
-              resolve();
-          } else {
-              this.mapIframe.onload = () => resolve();
-          }
-      });
+    return new Promise((resolve, reject) => {
+      if (this.mapIframe.contentWindow && this.mapIframe.contentWindow.document.readyState === 'complete') {
+        resolve();
+      } else {
+        const timeout = setTimeout(() => {
+          reject(new Error('Map iframe failed to load'));
+        }, 10000);
+        
+        this.mapIframe.onload = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        
+        this.mapIframe.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('Failed to load map iframe'));
+        };
+      }
+    });
   }
 
   async loadAndStartGame() {
     try {
-        const controllerPromise = new Promise(resolve => this.scene.addEventListener('controllerconnected', resolve, { once: true }));
-        const mapReadyPromise = this.waitForMapReady();
-        await Promise.all([this.loadCSV(), this.loadFunFacts()]);
-        this.generateGamePlaylist();
-        await this.preloadPlaylistImages();
-        await Promise.all([controllerPromise, mapReadyPromise]);
-        this.uiWrapper.setAttribute('visible', 'true');
-        this.vrLoadingUI.setAttribute('visible', 'false');
-        this.startNewRound();
+      // Check if required files exist first
+      if (!await this.checkFileExists('locations.csv')) {
+        this.showError("Missing required file: locations.csv");
+        return;
+      }
+      
+      if (!await this.checkFileExists('map.html')) {
+        this.showError("Missing required file: map.html");
+        return;
+      }
+
+      const controllerPromise = new Promise(resolve => {
+        this.scene.addEventListener('controllerconnected', resolve, { once: true });
+        // Timeout for controllers
+        setTimeout(() => resolve(), 3000);
+      });
+      
+      const mapReadyPromise = this.waitForMapReady().catch(e => {
+        throw new Error("Map failed to load: " + e.message);
+      });
+      
+      await Promise.all([
+        this.loadCSV().catch(e => { throw new Error("Failed to load locations: " + e.message) }),
+        this.loadFunFacts()
+      ]);
+      
+      this.generateGamePlaylist();
+      await this.preloadPlaylistImages();
+      await Promise.all([controllerPromise, mapReadyPromise]);
+      
+      this.uiWrapper.setAttribute('visible', 'true');
+      this.vrLoadingUI.setAttribute('visible', 'false');
+      this.startNewRound();
     } catch(error) {
-        this.funFactText.setAttribute('troika-text', 'value', `Error: ${error.message}`);
+      this.showError(error.message);
+      console.error(error);
     }
   }
 
@@ -184,69 +314,111 @@ class VRGeoGuessr {
     this.timerText.setAttribute('troika-text', 'value', `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
   }
 
-  startTimer() { this.updateTimer(); this.timer = setInterval(() => { this.timeLeft--; this.updateTimer(); if (this.timeLeft <= 0) { clearInterval(this.timer); this.endRound(false); } }, 1000); }
-  resetTimer() { clearInterval(this.timer); this.timeLeft = 120; }
+  startTimer() { 
+    this.updateTimer(); 
+    this.timer = setInterval(() => { 
+      this.timeLeft--; 
+      this.updateTimer(); 
+      if (this.timeLeft <= 0) { 
+        clearInterval(this.timer); 
+        this.endRound(false); 
+      } 
+    }, 1000); 
+  }
+  
+  resetTimer() { 
+    clearInterval(this.timer); 
+    this.timeLeft = 120; 
+  }
 
   async loadCSV() {
     return new Promise((resolve, reject) => {
-      Papa.parse('locations.csv', { download: true, header: true, skipEmptyLines: true,
+      Papa.parse('locations.csv', { 
+        download: true, 
+        header: true, 
+        skipEmptyLines: true,
         complete: (r) => {
-          this.data = r.data.map((row, index) => ({...row, id: `loc-${index}`}));
-          if (this.data.length === 0) return reject(new Error('No valid locations in CSV'));
+          if (r.errors.length > 0) {
+            console.warn("CSV parsing warnings:", r.errors);
+          }
+          this.data = r.data.filter(row => row.latitude && row.longitude && row.filename)
+                          .map((row, index) => ({...row, id: `loc-${index}`}));
+          if (this.data.length === 0) {
+            return reject(new Error('CSV file is empty or has no valid locations'));
+          }
           resolve();
-        }, error: (err) => reject(new Error(`CSV Error: ${err.message}`))
+        }, 
+        error: (err) => reject(new Error(`Could not load locations.csv: ${err.message}`))
       });
     });
   }
 
   async loadFunFacts() {
     return new Promise((resolve) => {
-      Papa.parse('FunFacts.csv', { download: true, header: true, skipEmptyLines: true,
-        complete: (r) => { this.funFacts = r.data.map(row => row.Fact); resolve(); },
-        error: (err) => { resolve(); }
+      Papa.parse('FunFacts.csv', { 
+        download: true, 
+        header: true, 
+        skipEmptyLines: true,
+        complete: (r) => { 
+          this.funFacts = r.data.filter(row => row.Fact).map(row => row.Fact); 
+          resolve(); 
+        },
+        error: (err) => { 
+          console.log("No fun facts loaded: " + err.message);
+          resolve(); 
+        }
       });
     });
   }
 
   generateGamePlaylist() {
-      const shuffledData = [...this.data].sort(() => 0.5 - Math.random());
-      this.gamePlaylist = shuffledData.slice(0, this.totalRounds);
+    const shuffledData = [...this.data].sort(() => 0.5 - Math.random());
+    this.gamePlaylist = shuffledData.slice(0, this.totalRounds);
   }
 
   preloadPlaylistImages() {
-      this.progressBar.setAttribute('visible', 'true');
-      let loadedCount = 0;
-      const totalImages = this.gamePlaylist.length;
-      this.progressText.setAttribute('troika-text', 'value', `(0/${totalImages})`);
-      if (this.funFacts.length > 0) {
-          this.funFactInterval = setInterval(() => {
-              const randomIndex = Math.floor(Math.random() * this.funFacts.length);
-              this.funFactText.setAttribute('troika-text', 'value', `Fun Fact:\n${this.funFacts[randomIndex]}`);
-          }, 3000);
-          this.funFactText.setAttribute('troika-text', 'value', `Fun Fact:\n${this.funFacts[0]}`);
-      } else {
-          this.funFactText.setAttribute('troika-text', 'value', 'Loading Images...');
-      }
-      const imageLoadPromises = this.gamePlaylist.map(location => {
-          return new Promise((resolve) => {
-              const img = document.createElement('img');
-              img.id = `img-${location.id}`;
-              img.crossOrigin = 'anonymous';
-              const onFinish = () => {
-                  loadedCount++;
-                  const progress = loadedCount / totalImages;
-                  this.progressText.setAttribute('troika-text', 'value', `(${loadedCount}/${totalImages})`);
-                  this.progressBarFill.setAttribute('width', progress);
-                  this.progressBarFill.object3D.position.x = -0.5 + (progress / 2);
-                  resolve();
-              };
-              img.onload = onFinish;
-              img.onerror = () => { location.failedToLoad = true; onFinish(); };
-              img.src = `Images/${location.filename.trim()}`;
-              this.assetsContainer.appendChild(img);
-          });
+    this.progressBar.setAttribute('visible', 'true');
+    let loadedCount = 0;
+    const totalImages = this.gamePlaylist.length;
+    this.progressText.setAttribute('troika-text', 'value', `(0/${totalImages})`);
+    
+    if (this.funFacts.length > 0) {
+      this.funFactInterval = setInterval(() => {
+        const randomIndex = Math.floor(Math.random() * this.funFacts.length);
+        this.funFactText.setAttribute('troika-text', 'value', `Fun Fact:\n${this.funFacts[randomIndex]}`);
+      }, 3000);
+      this.funFactText.setAttribute('troika-text', 'value', `Fun Fact:\n${this.funFacts[0]}`);
+    } else {
+      this.funFactText.setAttribute('troika-text', 'value', 'Loading Images...');
+    }
+    
+    const imageLoadPromises = this.gamePlaylist.map(location => {
+      return new Promise((resolve) => {
+        const img = document.createElement('img');
+        img.id = `img-${location.id}`;
+        img.crossOrigin = 'anonymous';
+        const onFinish = () => {
+          loadedCount++;
+          const progress = loadedCount / totalImages;
+          this.progressText.setAttribute('troika-text', 'value', `(${loadedCount}/${totalImages})`);
+          this.progressBarFill.setAttribute('width', progress);
+          this.progressBarFill.object3D.position.x = -0.5 + (progress / 2);
+          resolve();
+        };
+        img.onload = onFinish;
+        img.onerror = () => { 
+          console.warn(`Failed to load image: Images/${location.filename.trim()}`);
+          location.failedToLoad = true; 
+          onFinish(); 
+        };
+        img.src = `Images/${location.filename.trim()}`;
+        this.assetsContainer.appendChild(img);
       });
-      return Promise.all(imageLoadPromises).then(() => { clearInterval(this.funFactInterval); });
+    });
+    
+    return Promise.all(imageLoadPromises).then(() => { 
+      clearInterval(this.funFactInterval); 
+    });
   }
 
   applyMapTexture(dataUrl) {
@@ -255,50 +427,77 @@ class VRGeoGuessr {
     // Fallback for the plane material
     const image = new Image();
     image.onload = () => {
-        const texture = new THREE.CanvasTexture(image);
-        texture.needsUpdate = true;
-        const mesh = this.mapPanel.getObject3D('mesh');
-        if (mesh && mesh.material) {
-            mesh.material.map = texture;
-            mesh.material.needsUpdate = true;
-        }
+      const texture = new THREE.CanvasTexture(image);
+      texture.needsUpdate = true;
+      const mesh = this.mapPanel.getObject3D('mesh');
+      if (mesh && mesh.material) {
+        mesh.material.map = texture;
+        mesh.material.needsUpdate = true;
+      }
     };
     image.src = dataUrl;
   }
 
   setUIState(state) {
-      this.guessBtn.setAttribute('visible', false); this.guessBtn.classList.remove('clickable');
-      this.confirmBtn.setAttribute('visible', false); this.confirmBtn.classList.remove('clickable');
-      this.nextRoundBtn.setAttribute('visible', false); this.nextRoundBtn.classList.remove('clickable');
-      this.mapWrapper.setAttribute('visible', false);
-      this.resultsPanel.setAttribute('visible', false);
+    this.guessBtn.setAttribute('visible', false); 
+    this.guessBtn.classList.remove('clickable');
+    this.confirmBtn.setAttribute('visible', false); 
+    this.confirmBtn.classList.remove('clickable');
+    this.nextRoundBtn.setAttribute('visible', false); 
+    this.nextRoundBtn.classList.remove('clickable');
+    this.mapWrapper.setAttribute('visible', false);
+    this.resultsPanel.setAttribute('visible', false);
 
-      switch(state) {
-          case 'AWAITING_GUESS': this.guessBtn.setAttribute('visible', true); this.guessBtn.classList.add('clickable'); break;
-          case 'PLACING_GUESS': this.confirmBtn.setAttribute('visible', true); this.confirmBtn.classList.add('clickable'); this.mapWrapper.setAttribute('visible', true); break;
-          case 'SHOWING_RESULTS':
-              this.mapWrapper.setAttribute('visible', true); this.resultsPanel.setAttribute('visible', true);
-              if (this.round < this.totalRounds) { this.nextRoundBtn.setAttribute('visible', true); this.nextRoundBtn.classList.add('clickable'); }
-              break;
-          case 'GAME_OVER': this.mapWrapper.setAttribute('visible', true); this.resultsPanel.setAttribute('visible', true); break;
-      }
+    switch(state) {
+      case 'AWAITING_GUESS': 
+        this.guessBtn.setAttribute('visible', true); 
+        this.guessBtn.classList.add('clickable'); 
+        break;
+      case 'PLACING_GUESS': 
+        this.confirmBtn.setAttribute('visible', true); 
+        this.confirmBtn.classList.add('clickable'); 
+        this.mapWrapper.setAttribute('visible', true); 
+        break;
+      case 'SHOWING_RESULTS':
+        this.mapWrapper.setAttribute('visible', true); 
+        this.resultsPanel.setAttribute('visible', true);
+        if (this.round < this.totalRounds) { 
+          this.nextRoundBtn.setAttribute('visible', true); 
+          this.nextRoundBtn.classList.add('clickable'); 
+        }
+        break;
+      case 'GAME_OVER': 
+        this.mapWrapper.setAttribute('visible', true); 
+        this.resultsPanel.setAttribute('visible', true); 
+        break;
+    }
   }
 
   async startNewRound() {
     this.postMapCommand('cleanup');
     this.round++;
     if (this.round > this.totalRounds) {
-        this.setUIState('GAME_OVER');
-        this.resultsText.setAttribute('troika-text', 'value', `GAME OVER!\nFINAL SCORE: ${this.score}`);
-        return;
+      this.setUIState('GAME_OVER');
+      this.resultsText.setAttribute('troika-text', 'value', `GAME OVER!\nFINAL SCORE: ${this.score}`);
+      return;
     }
-    this.acceptingInput = false; this.currentGuess = null;
+    
+    this.acceptingInput = false; 
+    this.currentGuess = null;
     this.mapPin.setAttribute('visible', false);
     const location = this.gamePlaylist[this.round - 1];
     this.currentLocation = location;
-    this.sky.setAttribute('src', location.failedToLoad ? '#fallback' : `#img-${location.id}`);
+    
+    try {
+      this.sky.setAttribute('src', location.failedToLoad ? '#fallback' : `#img-${location.id}`);
+    } catch (e) {
+      console.error("Failed to set sky image:", e);
+      this.sky.setAttribute('src', '#fallback');
+    }
+    
     this.setUIState('AWAITING_GUESS');
-    this.resetTimer(); this.startTimer();
+    this.resetTimer(); 
+    this.startTimer();
     setTimeout(() => { this.acceptingInput = true; }, 500);
   }
 
@@ -314,7 +513,7 @@ class VRGeoGuessr {
 
     const lng = (mapUvX * 360 - 180);
     const n = Math.PI - 2 * Math.PI * mapUvY;
-    const lat = -((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+    const lat = -((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
 
     this.currentGuess = { lat, lng };
     this.postMapCommand('placeGuessPin', { latlng: this.currentGuess });
@@ -331,40 +530,60 @@ class VRGeoGuessr {
 
   submitGuess() {
     if (this.currentGuess) {
-        this.endRound(true);
+      this.endRound(true);
     } else {
-        this.locationText.setAttribute('troika-text', 'value', 'Please place a pin on the map first!');
+      this.locationText.setAttribute('troika-text', 'value', 'Please place a pin on the map first!');
     }
   }
 
   endRound(guessed) {
-    this.acceptingInput = false; clearInterval(this.timer);
+    this.acceptingInput = false; 
+    clearInterval(this.timer);
     this.mapPin.setAttribute('visible', 'false');
+    
     if (guessed) {
-        const location = this.currentLocation;
-        const actualLoc = [parseFloat(location.latitude), parseFloat(location.longitude)];
-        this.postMapCommand('showResults', { guessLatLng: this.currentGuess, actualLoc: actualLoc });
+      const location = this.currentLocation;
+      const actualLoc = [parseFloat(location.latitude), parseFloat(location.longitude)];
+      this.postMapCommand('showResults', { guessLatLng: this.currentGuess, actualLoc: actualLoc });
     } else {
-        this.processRoundResults(0, false);
+      this.processRoundResults(0, false);
     }
   }
 
-  calculateScore(distance) { return Math.round(5000 * Math.exp(-0.000002 * distance)); }
+  calculateScore(distance) { 
+    return Math.round(5000 * Math.exp(-0.000002 * distance)); 
+  }
 
   processRoundResults(distance, wasGuessed = true) {
-      let roundScore = 0;
-      if(wasGuessed) {
-          roundScore = this.calculateScore(distance);
-          this.score += roundScore;
-          this.scoreText.setAttribute('troika-text', 'value', `SCORE: ${this.score}`);
-      }
-      const resultsValue = `ROUND ${this.round}/${this.totalRounds}\n` + (wasGuessed ? `DISTANCE: ${(distance/1000).toFixed(1)} km\nPOINTS: ${roundScore}` : 'TIME EXPIRED!') + `\n\nTOTAL SCORE: ${this.score}`;
-      this.resultsText.setAttribute('troika-text', 'value', resultsValue);
-      this.setUIState(this.round < this.totalRounds ? 'SHOWING_RESULTS' : 'GAME_OVER');
-      if (this.round < this.totalRounds) { setTimeout(() => { this.acceptingInput = true; }, 500); }
+    let roundScore = 0;
+    if(wasGuessed) {
+      roundScore = this.calculateScore(distance);
+      this.score += roundScore;
+      this.scoreText.setAttribute('troika-text', 'value', `SCORE: ${this.score}`);
+    }
+    
+    const resultsValue = `ROUND ${this.round}/${this.totalRounds}\n` + 
+      (wasGuessed ? `DISTANCE: ${(distance/1000).toFixed(1)} km\nPOINTS: ${roundScore}` : 'TIME EXPIRED!') + 
+      `\n\nTOTAL SCORE: ${this.score}`;
+      
+    this.resultsText.setAttribute('troika-text', 'value', resultsValue);
+    this.setUIState(this.round < this.totalRounds ? 'SHOWING_RESULTS' : 'GAME_OVER');
+    
+    if (this.round < this.totalRounds) { 
+      setTimeout(() => { this.acceptingInput = true; }, 500); 
+    }
   }
 }
-document.addEventListener('DOMContentLoaded', () => { new VRGeoGuessr(); });
+
+document.addEventListener('DOMContentLoaded', () => { 
+  try {
+    new VRGeoGuessr(); 
+  } catch (error) {
+    document.getElementById('errorMessage').textContent = "Fatal error: " + error.message;
+    document.getElementById('errorMessage').style.display = 'block';
+    console.error(error);
+  }
+});
 </script>
 </body>
 </html>
