@@ -92,10 +92,13 @@
         </a-plane>
       </a-entity>
 
+      <!-- Map container with perfect aspect ratio -->
       <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
         <a-entity id="mapContainer">
+          <!-- Main map plane with exact 2:1 aspect ratio -->
           <a-plane id="mapPanel" class="clickable" width="4" height="2" material="shader: flat; side: double;">
-            <a-image id="mapImage" width="4" height="2" position="0 0 0.001"></a-image>
+            <!-- Map image that will perfectly fill the plane -->
+            <a-image id="mapImage" width="4" height="2" position="0 0 0.001" material="shader: flat; transparent: true;"></a-image>
           </a-plane>
           <a-entity id="locationText" position="0 -1.1 0.01" troika-text="value:; align: center; color: black; fontSize: 0.08; outlineWidth: 0.005; outlineColor: #FFF;"></a-entity>
         </a-entity>
@@ -422,12 +425,29 @@ class VRGeoGuessr {
   }
 
   applyMapTexture(dataUrl) {
-    this.mapImage.setAttribute('src', dataUrl);
-    
-    // Fallback for the plane material
-    const image = new Image();
-    image.onload = () => {
-      const texture = new THREE.CanvasTexture(image);
+    // Create a new image element to check dimensions first
+    const img = new Image();
+    img.onload = () => {
+      // Calculate the correct aspect ratio (should be 2:1 for world map)
+      const aspectRatio = img.width / img.height;
+      
+      // Apply to both the plane and image entity
+      const targetWidth = 4;
+      const targetHeight = targetWidth / aspectRatio;
+      
+      this.mapPanel.setAttribute('width', targetWidth);
+      this.mapPanel.setAttribute('height', targetHeight);
+      
+      this.mapImage.setAttribute('width', targetWidth);
+      this.mapImage.setAttribute('height', targetHeight);
+      this.mapImage.setAttribute('src', dataUrl);
+      
+      // Adjust the pin positioning to account for the new dimensions
+      const mapContainer = document.getElementById('mapContainer');
+      mapContainer.setAttribute('position', `0 ${(2 - targetHeight)/2} 0`);
+      
+      // Also update the plane's material for fallback
+      const texture = new THREE.CanvasTexture(img);
       texture.needsUpdate = true;
       const mesh = this.mapPanel.getObject3D('mesh');
       if (mesh && mesh.material) {
@@ -435,7 +455,10 @@ class VRGeoGuessr {
         mesh.material.needsUpdate = true;
       }
     };
-    image.src = dataUrl;
+    img.onerror = () => {
+      console.error("Failed to load map image");
+    };
+    img.src = dataUrl;
   }
 
   setUIState(state) {
@@ -508,21 +531,26 @@ class VRGeoGuessr {
   }
 
   handleControllerMapClick(uv) {
+    // Get the current dimensions of the map panel
+    const panelWidth = this.mapPanel.getAttribute('width');
+    const panelHeight = this.mapPanel.getAttribute('height');
+    
+    // Convert UV coordinates to map coordinates
     const mapUvX = uv.x;
     const mapUvY = uv.y;
 
+    // Convert to longitude/latitude
     const lng = (mapUvX * 360 - 180);
     const n = Math.PI - 2 * Math.PI * mapUvY;
-    const lat = -((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
+    const lat = -((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
 
     this.currentGuess = { lat, lng };
     this.postMapCommand('placeGuessPin', { latlng: this.currentGuess });
     this.locationText.setAttribute('troika-text', 'value', 'Pin placed! Click CONFIRM GUESS');
 
-    const planeWidth = this.mapPanel.getAttribute('width');
-    const planeHeight = this.mapPanel.getAttribute('height');
-    const x = (uv.x - 0.5) * planeWidth;
-    const y = (uv.y - 0.5) * planeHeight;
+    // Position the pin using the actual UV coordinates
+    const x = (uv.x - 0.5) * panelWidth;
+    const y = (uv.y - 0.5) * panelHeight;
 
     this.mapPin.setAttribute('position', `${x} ${y} 0.01`);
     this.mapPin.setAttribute('visible', 'true');
