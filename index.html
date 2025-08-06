@@ -58,11 +58,13 @@
             </a-plane>
           </a-entity>
 
-          <!-- ENHANCED: Made map panel significantly larger (3x width, 2x height) -->
           <a-entity id="mapWrapper" position="-2.5 1.5 -2.5" rotation="0 35 0" visible="false">
-            <a-plane id="mapPanel" class="clickable" width="4" height="2" material="shader: flat; color: #FFF; side: double; transparent: true;">
-              <a-entity id="locationText" position="0 -1.1 0.01" troika-text="value:; align: center; color: black; fontSize: 0.08; outlineWidth: 0.005; outlineColor: #FFF; font: Orbitron.ttf;" ></a-entity>
-            </a-plane>
+            <a-entity id="mapContainer">
+              <a-plane id="mapPanel" class="clickable" width="4" height="2" material="shader: flat; side: double;">
+                <a-image id="mapImage" width="4" height="2" position="0 0 0.001"></a-image>
+              </a-plane>
+              <a-entity id="locationText" position="0 -1.1 0.01" troika-text="value:; align: center; color: black; fontSize: 0.08; outlineWidth: 0.005; outlineColor: #FFF; font: Orbitron.ttf;"></a-entity>
+            </a-entity>
             <a-entity id="mapPin" visible="false">
                 <a-cone color="red" radius-bottom="0.03" radius-top="0" height="0.1" position="0 0.05 0.01" rotation="-90 0 0"></a-cone>
             </a-entity>
@@ -100,6 +102,7 @@ class VRGeoGuessr {
     this.nextRoundBtn = document.getElementById('nextRoundBtn');
     this.mapWrapper = document.getElementById('mapWrapper');
     this.mapPanel = document.getElementById('mapPanel');
+    this.mapImage = document.getElementById('mapImage');
     this.mapPin = document.getElementById('mapPin');
     this.locationText = document.getElementById('locationText');
     this.scoreText = document.getElementById('scoreText');
@@ -247,6 +250,9 @@ class VRGeoGuessr {
   }
 
   applyMapTexture(dataUrl) {
+    this.mapImage.setAttribute('src', dataUrl);
+    
+    // Fallback for the plane material
     const image = new Image();
     image.onload = () => {
         const texture = new THREE.CanvasTexture(image);
@@ -303,22 +309,17 @@ class VRGeoGuessr {
   }
 
   handleControllerMapClick(uv) {
-    // Adjusted for larger map - now uses full width for better accuracy
     const mapUvX = uv.x;
     const mapUvY = uv.y;
 
-    // Convert longitude directly (linear)
     const lng = (mapUvX * 360 - 180);
-
-    // Convert latitude using the inverse Mercator projection formula (non-linear)
     const n = Math.PI - 2 * Math.PI * mapUvY;
-    const lat = -((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))));
+    const lat = -((180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
 
     this.currentGuess = { lat, lng };
     this.postMapCommand('placeGuessPin', { latlng: this.currentGuess });
     this.locationText.setAttribute('troika-text', 'value', 'Pin placed! Click CONFIRM GUESS');
 
-    // Place the visual pin on the A-Frame plane using the original UV
     const planeWidth = this.mapPanel.getAttribute('width');
     const planeHeight = this.mapPanel.getAttribute('height');
     const x = (uv.x - 0.5) * planeWidth;
